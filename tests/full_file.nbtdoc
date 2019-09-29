@@ -1,0 +1,60 @@
+use minecraft::entity;
+
+/// A mob which can be bred. It has no other unique NBT
+compound Breedable extends entity::MobBase {
+	/// If the animal has been fed
+	InLove: int,
+	/// The age of the animal
+	Age: int,
+	/// The age of the animal. Will not increment
+	ForcedAge: int,
+	/// The UUIDLeast of the player who fed the animal
+	LoveCauseLeast: long,
+	/// The UUIDMost of the player who fed the animal
+	LoveCauseMost: long
+}
+ 
+Breedable describes entities[
+	minecraft:cow,
+	minecraft:pig
+];
+ 
+compound Sheep extends Breedable {
+	Sheared: boolean,
+	Color: Color
+}
+
+enum(byte) Color {
+	/// etc.
+	White = 0
+}
+ 
+Sheep describes entities[minecraft:sheep];
+
+ 
+compound Panda extends Breedable {
+	/// The displayed gene
+	/// If this gene is recessive '(r)' and 'HiddenGene' is not the same, the panda will display the 'normal' gene
+	MainGene: Gene,
+	/// The hidden gene
+	HiddenGene: Gene
+}
+ 
+enum(string) Gene {
+	/// The normal gene (d)
+	Normal = "normal",
+	/// The lazy gene (d)
+	Lazy = "lazy",
+	/// The worried gene (d)
+	Worried = "worried",
+	/// The playful gene (d)
+	Playful = "playful",
+	/// The brown gene (r)
+	Brown = "brown",
+	/// The weak gene (r)
+	Weak = "weak",
+	/// The aggressive gene (d)
+	Aggressive = "aggressive"
+}
+ 
+Panda describes entities[minecraft:panda];
