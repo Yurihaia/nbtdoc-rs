@@ -91,7 +91,7 @@ pub fn root<'a>(i: &'a str) -> IResult<&'a str, NbtDocFile> {
 enum RootItem {
 	Compound((String, CompoundDef)),
 	Describe((Vec<PathPart>, DescribeDef)),
-	Enum((String, EnumType)),
+	Enum((String, EnumDef)),
 	Use(Vec<PathPart>),
 	Mod(String)
 }
@@ -146,6 +146,16 @@ fn integer<'a, T: std::str::FromStr>(i: &'a str) -> IResult<&'a str, T> {
 	))(i)
 }
 
+fn natual<'a, T: std::str::FromStr>(i: &'a str) -> IResult<&'a str, T> {
+	alt((
+		map_res(tag("0"), str::parse),
+		map_res(tuple((
+			one_of("123456789"),
+			take_while(|c: char| c.is_ascii_digit())
+		)), |(f, t)| format!("{}{}", f, t).parse())
+	))(i)
+}
+
 fn range<'a, F, T>(f: F) -> impl Fn(&'a str) -> IResult<&'a str, Range<T>>
 	where F: Fn(&'a str) -> IResult<&'a str, T> + Copy {
 	alt((
@@ -168,6 +178,10 @@ fn range<'a, F, T>(f: F) -> impl Fn(&'a str) -> IResult<&'a str, Range<T>>
 
 fn int_range<'a, T: std::str::FromStr>(i: &'a str) -> IResult<&'a str, Range<T>> {
 	range(integer::<T>)(i)
+}
+
+fn natural_range<'a, T: std::str::FromStr>(i: &'a str) -> IResult<&'a str, Range<T>> {
+	range(natual::<T>)(i)
 }
 
 fn float_range<'a>(i: &'a str) -> IResult<&'a str, Range<f32>> {
@@ -221,7 +235,7 @@ macro_rules! array_map {
 				opt(preceded($atbind, int_range::<$t>)),
 				preceded(
 					tuple((sp, tag("["), sp, tag("]"))),
-					opt(preceded(pair(sp, $atbind), int_range::<i32>))
+					opt(preceded(pair(sp, $atbind), natural_range::<i32>))
 				)
 			),
 			|(v, l)| NumberArrayType::$id {
@@ -293,7 +307,7 @@ fn field_type<'a>(i: &'a str) -> IResult<&'a str, FieldType> {
 				field_type,
 				pair(sp, tag("]"))
 			),
-			opt(preceded(tuple((sp, tag("@"), sp)), int_range::<i32>))
+			opt(preceded(tuple((sp, tag("@"), sp)), natural_range::<i32>))
 		), |(f, r)| FieldType::ListType {
 			item_type: Box::new(f),
 			len_range: r
@@ -367,7 +381,7 @@ fn compound_def<'a>(i: &'a str) -> IResult<&'a str, (String, CompoundDef)> {
 	)(i)
 }
 
-fn enum_def<'a>(i: &'a str) -> IResult<&'a str, (String, EnumType)> {
+fn enum_def<'a>(i: &'a str) -> IResult<&'a str, (String, EnumDef)> {
 	alt((
 		enum_p("byte"),
 		enum_p("short"),
@@ -381,22 +395,22 @@ fn enum_def<'a>(i: &'a str) -> IResult<&'a str, (String, EnumType)> {
 
 macro_rules! enum_map {
 	($desc:expr, $fields:expr, $i:expr, $id:ident) => {
-		($i, EnumType::$id(EnumDef {
+		($i, EnumDef {
 			description: $desc,
-			values: $fields.into_iter().map(|((desc, id), v)| (id, EnumValue {
+			values: EnumType::$id($fields.into_iter().map(|((desc, id), v)| (id, EnumValue {
 				description: desc,
 				value: match v {
 					EnumVal::$id(v) => v,
 					_ => panic!("Something is very wrong")
 				}
-			})).collect()
-		}))
+			})).collect())
+		})
 	};
 }
 
 fn enum_p<'a>(
 	etype: &'static str
-) -> impl Fn(&'a str) -> IResult<&'a str, (String, EnumType)> {
+) -> impl Fn(&'a str) -> IResult<&'a str, (String, EnumDef)> {
 	map(
 		tuple((
 			terminated(doc_comment, sp),
@@ -717,9 +731,9 @@ mod tests {
 				}"#),
 				Ok(("", (
 					fs!("MyEnum"),
-					EnumType::Int(EnumDef {
+					EnumDef {
 						description: fs!(""),
-						values: vec![
+						values: EnumType::Int(vec![
 							(fs!("VarOne"), EnumValue {
 								description: fs!(""),
 								value: 1
@@ -732,8 +746,8 @@ mod tests {
 								description: fs!(""),
 								value: 5
 							})
-						]
-					})
+						])
+					}
 				)))
 			);
 		}
@@ -751,9 +765,9 @@ mod tests {
 				}"#),
 				Ok(("", (
 					fs!("MyEnum"),
-					EnumType::Int(EnumDef {
+					EnumDef {
 						description: fs!(" My Enum"),
-						values: vec![
+						values: EnumType::Int(vec![
 							(fs!("VarOne"), EnumValue {
 								description: fs!(" var one"),
 								value: 1
@@ -766,8 +780,8 @@ mod tests {
 								description: fs!(""),
 								value: 5
 							})
-						]
-					})
+						])
+					}
 				)))
 			);
 		}
@@ -952,18 +966,18 @@ mod tests {
 					})
 				],
 				enums: vec![
-					(fs!("Color"), EnumType::Byte(EnumDef {
+					(fs!("Color"), EnumDef {
 						description: fs!(""),
-						values: vec![
+						values: EnumType::Byte(vec![
 							(fs!("White"), EnumValue {
 								description: fs!(" etc."),
 								value: 0
 							})
-						]
-					})),
-					(fs!("Gene"), EnumType::String(EnumDef {
+						])
+					}),
+					(fs!("Gene"), EnumDef {
 						description: fs!(""),
-						values: vec![
+						values: EnumType::String(vec![
 							(fs!("Normal"), EnumValue {
 								description: fs!(" The normal gene (d)"),
 								value: fs!("normal")
@@ -992,8 +1006,8 @@ mod tests {
 								description: fs!(" The aggressive gene (d)"),
 								value: fs!("aggressive")
 							})
-						]
-					}))
+						])
+					})
 				],
 				describes: vec![
 					(vec![PathPart::Regular(fs!("Breedable"))], DescribeDef {

@@ -1,0 +1,13 @@
+mod small_file_sibling;
+
+compound MyCompound {
+	Foo: string
+}
+
+enum(byte) MyEnum {
+	VarOne = 1,
+	VarTwo = 2,
+	VarThree = 5
+}
+
+MyCompound describes items;

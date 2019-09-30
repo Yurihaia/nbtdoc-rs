@@ -1,0 +1,11 @@
+use super::MyCompound;
+use super::MyEnum;
+
+compound SpecificCompound extends MyCompound {
+	Bar: boolean,
+	bruh: MyEnum
+}
+
+SpecificCompound describes items[
+	minecraft:stick
+];

@@ -3,7 +3,7 @@
 pub struct NbtDocFile {
 	pub uses: Vec<IdentPath>,
 	pub compounds: Vec<(String, CompoundDef)>,
-	pub enums: Vec<(String, EnumType)>,
+	pub enums: Vec<(String, EnumDef)>,
 	pub describes: Vec<(IdentPath, DescribeDef)>,
 	pub mods: Vec<String>
 }
@@ -70,19 +70,19 @@ pub enum NumberArrayType {
 
 #[derive(Debug, PartialEq)]
 pub enum EnumType {
-	Byte(EnumDef<i8>),
-	Short(EnumDef<i16>),
-	Int(EnumDef<i32>),
-	Long(EnumDef<i64>),
-	Float(EnumDef<f32>),
-	Double(EnumDef<f64>),
-	String(EnumDef<String>)
+	Byte(Vec<(String, EnumValue<i8>)>),
+	Short(Vec<(String, EnumValue<i16>)>),
+	Int(Vec<(String, EnumValue<i32>)>),
+	Long(Vec<(String, EnumValue<i64>)>),
+	Float(Vec<(String, EnumValue<f32>)>),
+	Double(Vec<(String, EnumValue<f64>)>),
+	String(Vec<(String, EnumValue<String>)>)
 }
 
 #[derive(Debug, PartialEq)]
-pub struct EnumDef<T> {
+pub struct EnumDef {
 	pub description: String,
-	pub values: Vec<(String, EnumValue<T>)>
+	pub values: EnumType
 }
 
 #[derive(Debug, PartialEq)]
