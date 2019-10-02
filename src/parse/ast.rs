@@ -1,3 +1,7 @@
+use crate::validation::{
+	DescribeType,
+	FieldPath
+};
 
 #[derive(Debug, PartialEq)]
 pub struct NbtDocFile {
@@ -39,7 +43,12 @@ pub enum FieldType {
 		item_type: Box<FieldType>,
 		len_range: Option<Range<i32>>
 	},
-	NamedType(IdentPath)
+	NamedType(IdentPath),
+	IndexType {
+		target: DescribeType,
+		path: Vec<FieldPath>
+	},
+	IdType(DescribeType)
 }
 
 #[derive(Debug, PartialEq)]
@@ -89,14 +98,6 @@ pub struct EnumDef {
 pub struct EnumValue<T> {
 	pub description: String,
 	pub value: T
-}
-
-#[derive(Debug, PartialEq)]
-pub enum DescribeType {
-	Entities,
-	Blocks,
-	Items,
-	Storage
 }
 
 #[derive(Debug, PartialEq)]

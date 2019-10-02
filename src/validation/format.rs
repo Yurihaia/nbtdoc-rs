@@ -57,12 +57,6 @@ pub struct NumberArrayTag<T> {
 }
 
 #[derive(Debug)]
-pub struct ListTag {
-	pub length_range: Option<Range<i32>>,
-	pub value_type: Box<NbtValue>
-}
-
-#[derive(Debug)]
 pub struct Range<T>(pub T, pub T);
 
 #[derive(Debug)]
@@ -87,5 +81,27 @@ pub enum NbtValue {
 	LongArray(NumberArrayTag<i64>),
 	Compound(Index<CompoundTag>),
 	Enum(Index<EnumItem>),
-	List(ListTag)
+	List {
+		length_range: Option<Range<i32>>,
+		value_type: Box<NbtValue>
+	},
+	Index {
+		target: DescribeType,
+		path: Vec<FieldPath>
+	},
+	Id(DescribeType)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum FieldPath {
+	Super,
+	Child(String)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DescribeType {
+	Entities,
+	Blocks,
+	Items,
+	Storage
 }

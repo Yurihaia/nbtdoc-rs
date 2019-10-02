@@ -38,6 +38,11 @@ use nom::{
 	IResult
 };
 
+use crate::validation::{
+	DescribeType,
+	FieldPath
+};
+
 use super::ast::*;
 
 pub fn root<'a>(i: &'a str) -> IResult<&'a str, NbtDocFile> {
@@ -312,8 +317,46 @@ fn field_type<'a>(i: &'a str) -> IResult<&'a str, FieldType> {
 			item_type: Box::new(f),
 			len_range: r
 		}),
+		map(
+			pair(
+				terminated(describe_type, sp),
+				delimited(
+					pair(tag("["), sp),
+					field_path,
+					pair(sp, tag("]"))
+				)
+			),
+			|(d, p)| FieldType::IndexType {
+				target: d,
+				path: p
+			}
+		),
+		map(
+			preceded(
+				pair(tag("id"), sp), 
+				delimited(
+					pair(tag("("), sp),
+					describe_type,
+					pair(sp, tag(")"))
+				)
+			),
+			FieldType::IdType
+		),
 		map(ident_path, FieldType::NamedType)
 	))(i)
+}
+
+fn field_path<'a>(i: &'a str) -> IResult<&'a str, Vec<FieldPath>> {
+	map(
+		separated_list(
+			tag("."),
+			ident
+		),
+		|v| v.into_iter().map(|x| match x {
+			"super" => FieldPath::Super,
+			x => FieldPath::Child(String::from(x))
+		}).collect()
+	)(i)
 }
 
 fn key<'a>(i: &'a str) -> IResult<&'a str, &'a str> {
@@ -465,16 +508,26 @@ enum EnumVal {
 	String(String)
 }
 
+fn describe_type<'a>(i: &'a str) -> IResult<&'a str, DescribeType> {
+	map(alt((
+		tag("entities"),
+		tag("blocks"),
+		tag("items"),
+		tag("storage")
+	)), |v| match v {
+		"entities" => DescribeType::Entities,
+		"blocks" => DescribeType::Blocks,
+		"items" => DescribeType::Items,
+		"storage" => DescribeType::Storage,
+		_ => panic!()
+	})(i)
+}
+
 fn describe_def<'a>(i: &'a str) -> IResult<&'a str, (Vec<PathPart>, DescribeDef)> {
 	map(
 		tuple((
 			terminated(ident_path, pair(sp1, tag("describes"))),
-			preceded(sp1, alt((
-				tag("entities"),
-				tag("blocks"),
-				tag("items"),
-				tag("storage")
-			))),
+			preceded(sp1, describe_type),
 			preceded(sp, opt(delimited(
 				pair(tag("["), sp),
 				separated_list(
@@ -486,13 +539,7 @@ fn describe_def<'a>(i: &'a str) -> IResult<&'a str, (Vec<PathPart>, DescribeDef)
 			tag(";")
 		)),
 		|(id, t, v, _)| (id, DescribeDef {
-			describe_type: match t {
-				"entities" => DescribeType::Entities,
-				"blocks" => DescribeType::Blocks,
-				"items" => DescribeType::Items,
-				"storage" => DescribeType::Storage,
-				_ => panic!("Something is very wrong")
-			},
+			describe_type: t,
 			targets: v.map(|v| v.into_iter().map(String::from).collect())
 		})
 	)(i)
@@ -680,6 +727,23 @@ mod tests {
 				PathPart::Regular(fs!("module")),
 				PathPart::Regular(fs!("FooBar"))
 			]))))
+		}
+
+		#[test]
+		fn id_type() {
+			assert_eq!(field_type("id(items)"), Ok(("", FieldType::IdType(DescribeType::Items))))
+		}
+
+		#[test]
+		fn path_index() {
+			assert_eq!(field_type("items[id.super.field]"), Ok(("", FieldType::IndexType {
+				path: vec![
+					FieldPath::Child(fs!("id")),
+					FieldPath::Super,
+					FieldPath::Child(fs!("field"))
+				],
+				target: DescribeType::Items
+			})))
 		}
 	}
 
