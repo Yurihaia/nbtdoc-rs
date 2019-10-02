@@ -242,10 +242,10 @@ impl Root {
 				_ => return Err(RootError::DescribeType)
 			};
 			let dt = match d.describe_type {
-				ast::DescribeType::Entities => &mut self.entities,
-				ast::DescribeType::Blocks => &mut self.blocks,
-				ast::DescribeType::Items => &mut self.items,
-				ast::DescribeType::Storage => &mut self.storages
+				DescribeType::Entities => &mut self.entities,
+				DescribeType::Blocks => &mut self.blocks,
+				DescribeType::Items => &mut self.items,
+				DescribeType::Storage => &mut self.storages
 			};
 			for n in d.targets.unwrap_or_else(|| vec![String::from("")]) {
 				if dt.contains_key(&n) {
@@ -391,12 +391,14 @@ impl Root {
 					range: range.map(|x|convert_range(x, std::f64::NEG_INFINITY,  std::f64::INFINITY))
 				})
 			},
-			ast::FieldType::ListType { item_type, len_range } => NbtValue::List(ListTag {
+			ast::FieldType::ListType { item_type, len_range } => NbtValue::List {
 				length_range: len_range.map(|x|convert_range(x, 0, i32::max_value())),
 				value_type: Box::from(
 					self.convert_field_type(*item_type, root, imports)?
 				)
-			})
+			},
+			ast::FieldType::IndexType { target, path } => NbtValue::Index { path, target },
+			ast::FieldType::IdType(v) => NbtValue::Id(v)
 		})
 	}
 }
