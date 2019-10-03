@@ -336,11 +336,11 @@ fn field_type<'a>(i: &'a str) -> IResult<&'a str, FieldType> {
 				pair(tag("id"), sp), 
 				delimited(
 					pair(tag("("), sp),
-					describe_type,
+					mc_ident,
 					pair(sp, tag(")"))
 				)
 			),
-			FieldType::IdType
+			|x| FieldType::IdType(String::from(x))
 		),
 		map(ident_path, FieldType::NamedType)
 	))(i)
@@ -523,6 +523,10 @@ fn describe_type<'a>(i: &'a str) -> IResult<&'a str, DescribeType> {
 	})(i)
 }
 
+fn mc_ident<'a>(i: &'a str) -> IResult<&'a str, &'a str> {
+	take_while(|c: char| c.is_ascii_lowercase() || "_-:/".contains(c))(i)
+}
+
 fn describe_def<'a>(i: &'a str) -> IResult<&'a str, (Vec<PathPart>, DescribeDef)> {
 	map(
 		tuple((
@@ -532,7 +536,7 @@ fn describe_def<'a>(i: &'a str) -> IResult<&'a str, (Vec<PathPart>, DescribeDef)
 				pair(tag("["), sp),
 				separated_list(
 					tuple((sp, tag(","), sp)),
-					take_while(|c: char| c.is_ascii_lowercase() || "_-:/".contains(c))
+					mc_ident
 				),
 				pair(sp, tag("]")))
 			)),
@@ -731,7 +735,9 @@ mod tests {
 
 		#[test]
 		fn id_type() {
-			assert_eq!(field_type("id(items)"), Ok(("", FieldType::IdType(DescribeType::Items))))
+			assert_eq!(field_type("id(minecraft:item)"), Ok(("", 
+				FieldType::IdType(fs!("minecraft:item"))))
+			)
 		}
 
 		#[test]

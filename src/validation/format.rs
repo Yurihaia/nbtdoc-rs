@@ -89,7 +89,7 @@ pub enum NbtValue {
 		target: DescribeType,
 		path: Vec<FieldPath>
 	},
-	Id(DescribeType)
+	Id(String)
 }
 
 #[derive(Debug, PartialEq, Eq)]
