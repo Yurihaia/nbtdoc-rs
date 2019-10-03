@@ -48,7 +48,7 @@ pub enum FieldType {
 		target: DescribeType,
 		path: Vec<FieldPath>
 	},
-	IdType(DescribeType)
+	IdType(String)
 }
 
 #[derive(Debug, PartialEq)]
