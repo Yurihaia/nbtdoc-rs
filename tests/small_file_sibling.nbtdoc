@@ -6,6 +6,6 @@ compound SpecificCompound extends MyCompound {
 	bruh: MyEnum
 }
 
-SpecificCompound describes items[
+SpecificCompound describes minecraft:item[
 	minecraft:stick
 ];

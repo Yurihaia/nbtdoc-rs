@@ -10,4 +10,4 @@ enum(byte) MyEnum {
 	VarThree = 5
 }
 
-MyCompound describes items;
+MyCompound describes minecraft:item;

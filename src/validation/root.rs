@@ -225,9 +225,8 @@ impl Root {
 				ItemIndex::Compound(v) => v,
 				_ => return Err(RootError::DescribeType)
 			};
-			let (ref mut dt, ref mut def) = self.registries.get_mut(&d.describe_type).ok_or(
-				RootError::UnresolvedItem(format!("{}", d.describe_type))
-			)?;
+			let (ref mut dt, ref mut def) = self.registries.entry(d.describe_type)
+				.or_default();
 			if let Some(targets) = d.targets {
 				for n in targets {
 					if dt.contains_key(&n) {
