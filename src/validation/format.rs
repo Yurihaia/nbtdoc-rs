@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::arena::Index;
+use crate::identifier::Identifier;
 
 #[derive(Debug)]
 pub struct EnumItem {
@@ -86,22 +87,14 @@ pub enum NbtValue {
 		value_type: Box<NbtValue>
 	},
 	Index {
-		target: DescribeType,
+		target: Identifier,
 		path: Vec<FieldPath>
 	},
-	Id(String)
+	Id(Identifier)
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum FieldPath {
 	Super,
 	Child(String)
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum DescribeType {
-	Entities,
-	Blocks,
-	Items,
-	Storage
 }

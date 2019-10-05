@@ -20,14 +20,16 @@ use std::fmt::{
 	Formatter
 };
 
+use crate::identifier::Identifier;
+
 use std::convert::From;
 
 #[derive(Debug)]
 pub struct Root {
-	entities: HashMap<String, Index<CompoundTag>>,
-	blocks: HashMap<String, Index<CompoundTag>>,
-	items: HashMap<String, Index<CompoundTag>>,
-	storages: HashMap<String, Index<CompoundTag>>,
+	registries: HashMap<Identifier, (
+		HashMap<Identifier, Index<CompoundTag>>,
+		Option<Index<CompoundTag>>
+	)>,
 
 	root_modules: HashMap<String, Index<Module>>,
 
@@ -39,10 +41,7 @@ pub struct Root {
 impl Root {
 	pub fn new() -> Self {
 		Root {
-			entities: HashMap::new(),
-			blocks: HashMap::new(),
-			items: HashMap::new(),
-			storages: HashMap::new(),
+			registries: HashMap::new(),
 
 			root_modules: HashMap::new(),
 
@@ -52,24 +51,9 @@ impl Root {
 		}
 	}
 
-	pub fn get_entity(&self, name: &str) -> Option<&CompoundTag> {
-		Some(&self.compound_arena[*self.entities.get(name)?])
-	}
-
-	pub fn get_block(&self, name: &str) -> Option<&CompoundTag> {
-		Some(&self.compound_arena[*self.blocks.get(name)?])
-	}
-
-	pub fn get_item(&self, name: &str) -> Option<&CompoundTag> {
-		Some(&self.compound_arena[*self.items.get(name)?])
-	}
-
-	pub fn get_storage(&self, name: &str) -> Option<&CompoundTag> {
-		Some(&self.compound_arena[*self.storages.get(name)?])
-	}
-
-	pub fn get_module(&self, name: Index<Module>) -> &Module {
-		&self.module_arena[name]
+	pub fn get_regitry(&self, name: &Identifier, id: &Identifier) -> Option<&CompoundTag> {
+		let (r, d) = self.registries.get(name)?;
+		Some(&self.compound_arena[*r.get(id).unwrap_or(&(*d)?)])
 	}
 
 	pub fn get_compound(&self, name: Index<CompoundTag>) -> &CompoundTag {
@@ -241,18 +225,22 @@ impl Root {
 				ItemIndex::Compound(v) => v,
 				_ => return Err(RootError::DescribeType)
 			};
-			let dt = match d.describe_type {
-				DescribeType::Entities => &mut self.entities,
-				DescribeType::Blocks => &mut self.blocks,
-				DescribeType::Items => &mut self.items,
-				DescribeType::Storage => &mut self.storages
-			};
-			for n in d.targets.unwrap_or_else(|| vec![String::from("")]) {
-				if dt.contains_key(&n) {
-					return Err(RootError::DuplicateDescribe(n))
+			let (ref mut dt, ref mut def) = self.registries.get_mut(&d.describe_type).ok_or(
+				RootError::UnresolvedItem(format!("{}", d.describe_type))
+			)?;
+			if let Some(targets) = d.targets {
+				for n in targets {
+					if dt.contains_key(&n) {
+						return Err(RootError::DuplicateDescribe(format!("{}", n)))
+					}
+					dt.insert(n, target);
 				}
-				dt.insert(n, target);
-			};
+			} else {
+				if def.is_some() {
+					return Err(RootError::DuplicateDescribe(String::from("\"default\"")))
+				}
+				*def = Some(target);
+			}
 		}
 		Ok(rootind)
 	}
