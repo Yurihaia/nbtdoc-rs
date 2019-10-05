@@ -343,7 +343,18 @@ fn field_type<'a>(i: &'a str) -> IResult<&'a str, FieldType> {
 			),
 			FieldType::IdType
 		),
-		map(ident_path, FieldType::NamedType)
+		map(ident_path, FieldType::NamedType),
+		map(
+			delimited(
+				pair(tag("("), sp),
+				separated_list(
+					tuple((sp, tag("|"), sp)),
+					field_type
+				),
+				pair(sp, tag(")"))
+			),
+			FieldType::OrType
+		)
 	))(i)
 }
 
@@ -758,6 +769,17 @@ mod tests {
 				],
 				target: id!("minecraft", "item")
 			})))
+		}
+
+		#[test]
+		fn or_type() {
+			assert_eq!(field_type("(int | boolean | byte @ 0..1)"), Ok(("", FieldType::OrType(vec![
+				FieldType::NumberType(NumberPrimitiveType::Int(None)),
+				FieldType::BooleanType,
+				FieldType::NumberType(NumberPrimitiveType::Byte(Some(
+					Range::Both(0, 1)
+				)))
+			]))))
 		}
 	}
 

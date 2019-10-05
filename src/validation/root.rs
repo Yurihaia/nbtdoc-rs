@@ -385,7 +385,10 @@ impl Root {
 				)
 			},
 			ast::FieldType::IndexType { target, path } => NbtValue::Index { path, target },
-			ast::FieldType::IdType(v) => NbtValue::Id(v)
+			ast::FieldType::IdType(v) => NbtValue::Id(v),
+			ast::FieldType::OrType(v) => NbtValue::Or(v.into_iter().map(
+				|x| self.convert_field_type(x, root, imports)
+			).collect::<Result<Vec<NbtValue>, RootError>>()?)
 		})
 	}
 }
