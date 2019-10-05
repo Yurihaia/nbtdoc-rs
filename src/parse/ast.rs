@@ -46,7 +46,8 @@ pub enum FieldType {
 		target: Identifier,
 		path: Vec<FieldPath>
 	},
-	IdType(Identifier)
+	IdType(Identifier),
+	OrType(Vec<FieldType>)
 }
 
 #[derive(Debug, PartialEq)]

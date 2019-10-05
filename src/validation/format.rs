@@ -90,7 +90,8 @@ pub enum NbtValue {
 		target: Identifier,
 		path: Vec<FieldPath>
 	},
-	Id(Identifier)
+	Id(Identifier),
+	Or(Vec<NbtValue>)
 }
 
 #[derive(Debug, PartialEq, Eq)]
