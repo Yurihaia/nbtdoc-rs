@@ -28,7 +28,8 @@ use nom::{
 	multi::{
 		separated_list,
 		many0,
-		many1
+		many1,
+		separated_nonempty_list
 	},
 	number::complete::{
 		double,
@@ -39,9 +40,9 @@ use nom::{
 };
 
 use crate::validation::{
-	DescribeType,
 	FieldPath
 };
+use crate::identifier::Identifier;
 
 use super::ast::*;
 
@@ -319,7 +320,7 @@ fn field_type<'a>(i: &'a str) -> IResult<&'a str, FieldType> {
 		}),
 		map(
 			pair(
-				terminated(describe_type, sp),
+				terminated(mc_ident, sp),
 				delimited(
 					pair(tag("["), sp),
 					field_path,
@@ -340,7 +341,7 @@ fn field_type<'a>(i: &'a str) -> IResult<&'a str, FieldType> {
 					pair(sp, tag(")"))
 				)
 			),
-			|x| FieldType::IdType(String::from(x))
+			FieldType::IdType
 		),
 		map(ident_path, FieldType::NamedType)
 	))(i)
@@ -508,30 +509,28 @@ enum EnumVal {
 	String(String)
 }
 
-fn describe_type<'a>(i: &'a str) -> IResult<&'a str, DescribeType> {
-	map(alt((
-		tag("entities"),
-		tag("blocks"),
-		tag("items"),
-		tag("storage")
-	)), |v| match v {
-		"entities" => DescribeType::Entities,
-		"blocks" => DescribeType::Blocks,
-		"items" => DescribeType::Items,
-		"storage" => DescribeType::Storage,
-		_ => panic!()
-	})(i)
-}
-
-fn mc_ident<'a>(i: &'a str) -> IResult<&'a str, &'a str> {
-	take_while(|c: char| c.is_ascii_lowercase() || "_-:/".contains(c))(i)
+fn mc_ident<'a>(i: &'a str) -> IResult<&'a str, Identifier> {
+	map(
+		tuple((
+			take_while1(|c: char| c.is_ascii_lowercase() | "-_".contains(c)),
+			tag(":"),
+			separated_nonempty_list(
+				tag("/"),
+				take_while1(|c: char| c.is_ascii_lowercase() | "-_".contains(c))
+			)
+		)),
+		|(v, _, p)| Identifier::new(
+			String::from(v),
+			p.join("/")
+		)
+	)(i)
 }
 
 fn describe_def<'a>(i: &'a str) -> IResult<&'a str, (Vec<PathPart>, DescribeDef)> {
 	map(
 		tuple((
 			terminated(ident_path, pair(sp1, tag("describes"))),
-			preceded(sp1, describe_type),
+			preceded(sp1, mc_ident),
 			preceded(sp, opt(delimited(
 				pair(tag("["), sp),
 				separated_list(
@@ -544,7 +543,7 @@ fn describe_def<'a>(i: &'a str) -> IResult<&'a str, (Vec<PathPart>, DescribeDef)
 		)),
 		|(id, t, v, _)| (id, DescribeDef {
 			describe_type: t,
-			targets: v.map(|v| v.into_iter().map(String::from).collect())
+			targets: v
 		})
 	)(i)
 }
@@ -564,6 +563,15 @@ mod tests {
 		($e:expr) => {
 			String::from($e)
 		};
+	}
+
+	macro_rules! id {
+		($n:expr, $e:expr) => {
+			Identifier {
+				namespace: String::from($n),
+				path: String::from($e)
+			}
+		}
 	}
 
 	use super::*;
@@ -736,19 +744,19 @@ mod tests {
 		#[test]
 		fn id_type() {
 			assert_eq!(field_type("id(minecraft:item)"), Ok(("", 
-				FieldType::IdType(fs!("minecraft:item"))))
+				FieldType::IdType(id!("minecraft", "item"))))
 			)
 		}
 
 		#[test]
 		fn path_index() {
-			assert_eq!(field_type("items[id.super.field]"), Ok(("", FieldType::IndexType {
+			assert_eq!(field_type("minecraft:item[id.super.field]"), Ok(("", FieldType::IndexType {
 				path: vec![
 					FieldPath::Child(fs!("id")),
 					FieldPath::Super,
 					FieldPath::Child(fs!("field"))
 				],
-				target: DescribeType::Items
+				target: id!("minecraft", "item")
 			})))
 		}
 	}
@@ -759,14 +767,14 @@ mod tests {
 		#[test]
 		fn simple() {
 			assert_eq!(
-				describe_def("MyCompound describes items[minecraft:stick, minecraft:tnt];"),
+				describe_def("MyCompound describes minecraft:item[minecraft:stick, minecraft:tnt];"),
 				Ok(("", (
 					vec![PathPart::Regular(fs!("MyCompound"))],
 					DescribeDef {
-						describe_type: DescribeType::Items,
+						describe_type: id!("minecraft", "item"),
 						targets: Some(vec![
-							fs!("minecraft:stick"),
-							fs!("minecraft:tnt"),
+							id!("minecraft", "stick"),
+							id!("minecraft", "tnt"),
 						])
 					}
 				)))
@@ -776,11 +784,11 @@ mod tests {
 		#[test]
 		fn all() {
 			assert_eq!(
-				describe_def("MyCompound describes blocks;"),
+				describe_def("MyCompound describes minecraft:block;"),
 				Ok(("", (
 					vec![PathPart::Regular(fs!("MyCompound"))],
 					DescribeDef {
-						describe_type: DescribeType::Blocks,
+						describe_type: id!("minecraft", "block"),
 						targets: None
 					}
 				)))
@@ -1081,22 +1089,22 @@ mod tests {
 				],
 				describes: vec![
 					(vec![PathPart::Regular(fs!("Breedable"))], DescribeDef {
-						describe_type: DescribeType::Entities,
+						describe_type: id!("minecraft", "entity"),
 						targets: Some(vec![
-							fs!("minecraft:cow"),
-							fs!("minecraft:pig")
+							id!("minecraft", "cow"),
+							id!("minecraft", "pig")
 						])
 					}),
 					(vec![PathPart::Regular(fs!("Sheep"))], DescribeDef {
-						describe_type: DescribeType::Entities,
+						describe_type: id!("minecraft", "entity"),
 						targets: Some(vec![
-							fs!("minecraft:sheep"),
+							id!("minecraft", "sheep"),
 						])
 					}),
 					(vec![PathPart::Regular(fs!("Panda"))], DescribeDef {
-						describe_type: DescribeType::Entities,
+						describe_type: id!("minecraft", "entity"),
 						targets: Some(vec![
-							fs!("minecraft:panda"),
+							id!("minecraft", "panda"),
 						])
 					})
 				]

@@ -14,7 +14,7 @@ compound Breedable extends entity::MobBase {
 	LoveCauseMost: long
 }
  
-Breedable describes entities[
+Breedable describes minecraft:entity[
 	minecraft:cow,
 	minecraft:pig
 ];
@@ -29,7 +29,7 @@ enum(byte) Color {
 	White = 0
 }
  
-Sheep describes entities[minecraft:sheep];
+Sheep describes minecraft:entity[minecraft:sheep];
 
  
 compound Panda extends Breedable {
@@ -57,4 +57,4 @@ enum(string) Gene {
 	Aggressive = "aggressive"
 }
  
-Panda describes entities[minecraft:panda];
+Panda describes minecraft:entity[minecraft:panda];

@@ -1,7 +1,5 @@
-use crate::validation::{
-	DescribeType,
-	FieldPath
-};
+use crate::validation::FieldPath;
+use crate::identifier::Identifier;
 
 #[derive(Debug, PartialEq)]
 pub struct NbtDocFile {
@@ -45,10 +43,10 @@ pub enum FieldType {
 	},
 	NamedType(IdentPath),
 	IndexType {
-		target: DescribeType,
+		target: Identifier,
 		path: Vec<FieldPath>
 	},
-	IdType(String)
+	IdType(Identifier)
 }
 
 #[derive(Debug, PartialEq)]
@@ -102,8 +100,8 @@ pub struct EnumValue<T> {
 
 #[derive(Debug, PartialEq)]
 pub struct DescribeDef {
-	pub describe_type: DescribeType,
-	pub targets: Option<Vec<String>>
+	pub describe_type: Identifier,
+	pub targets: Option<Vec<Identifier>>
 }
 
 type IdentPath = Vec<PathPart>;
