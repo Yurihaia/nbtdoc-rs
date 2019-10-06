@@ -80,24 +80,25 @@ impl Root {
 			module_name,
 			fp
 		)?;
-		let rind = self.register_module_tree(module_tree, None)?;
+		let root = self.register_module(Module {
+			children: HashMap::new(),
+			parent: None
+		});
 		self.root_modules.insert(
 			String::from(module_name),
-			rind
+			root
 		);
+		self.register_module_tree(root, &module_tree)?;
+		self.resolve_module_tree(root, module_tree)?;
 		Ok(())
 	}
 
 	fn register_module_tree(
 		&mut self,
-		tree: ModuleTree,
-		parent: Option<Index<Module>>
-	) -> Result<Index<Module>, RootError> {
-		let rootind = self.register_module(Module {
-			children: HashMap::new(),
-			parent
-		});
-		let cast = tree.val;
+		rootind: Index<Module>,
+		tree: &ModuleTree
+	) -> Result<(), RootError> {
+		let cast = &tree.val;
 		// first register items so lower modules can resolve
 		for (n, _) in cast.compounds.iter() {
 			let ind = self.register_compound(CompoundTag {
@@ -123,11 +124,27 @@ impl Root {
 			self.module_arena[rootind].children.insert(n.clone(), ItemIndex::Enum(ind));
 		}
 		// register modules, which will register their items
-		for (n, m) in tree.children {
-			let module = self.register_module_tree(m, Some(rootind))?;
-			self.module_arena[rootind].children.insert(n, ItemIndex::Module(module));
+		let mut next = Vec::with_capacity(tree.children.len());
+		for (n, m) in tree.children.iter() {
+			let root = self.register_module(Module {
+				children: HashMap::new(),
+				parent: Some(rootind)
+			});
+			self.module_arena[rootind].children.insert(n.clone(), ItemIndex::Module(root));
+			next.push((root, m));
 		}
-		// now everything has been registered so name resolution can begin
+		for (root, m) in next.into_iter() {
+			self.register_module_tree(root, &m)?;
+		};
+		Ok(())
+	}
+
+	fn resolve_module_tree(
+		&mut self,
+		rootind: Index<Module>,
+		tree: ModuleTree
+	) -> Result<(), RootError> {
+		let cast = tree.val;
 		let mut imports = HashMap::new();
 		for n in cast.uses {
 			imports.insert(
@@ -240,8 +257,8 @@ impl Root {
 				}
 				*def = Some(target);
 			}
-		}
-		Ok(rootind)
+		};
+		Ok(())
 	}
 
 	fn get_item_path(
@@ -292,11 +309,11 @@ impl Root {
 				path.ok_or(RootError::RootAccess)?
 			].parent.map(ItemIndex::Module),
 			ast::PathPart::Regular(v) => Some(match path {
-				Some(i) => self.module_arena[i].children.get(v.as_str()).cloned(),
+				Some(i) => self.module_arena[i].children.get(v.as_str()).cloned().or_else(
+						|| imports.and_then(|h| h.get(v.as_str())).cloned()
+					),
 				None => self.root_modules.get(v.as_str()).map(|v| ItemIndex::Module(*v))
-			}.or_else(
-				|| imports.and_then(|h| h.get(v.as_str())).cloned()
-			).ok_or(RootError::UnresolvedItem(v.clone()))?)
+			}.ok_or_else(|| RootError::UnresolvedItem(v.clone()))?)
 		})
 	}
 
