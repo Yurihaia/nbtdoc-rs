@@ -24,6 +24,8 @@ use crate::identifier::Identifier;
 
 use std::convert::From;
 
+use nom::error::convert_error;
+
 #[derive(Debug)]
 pub struct Root {
 	registries: HashMap<Identifier, (
@@ -65,13 +67,13 @@ impl Root {
 		&mut self,
 		p: P,
 		fp: &F
-	) -> Result<(), RootError> where F: FileProvider, P: AsRef<Path> {
+	) -> Result<(), NbtDocError> where F: FileProvider, P: AsRef<Path> {
 		let module_name = p.as_ref()
 			.file_stem()
 			.ok_or(
 				io::Error::from(io::ErrorKind::NotFound)
 			)?.to_str().ok_or_else(
-				|| RootError::InvalidName(
+				|| ValidationError::InvalidName(
 					p.as_ref().file_name().unwrap().to_os_string()
 				)
 			)?;
@@ -97,7 +99,7 @@ impl Root {
 		&mut self,
 		rootind: Index<Module>,
 		tree: &ModuleTree
-	) -> Result<(), RootError> {
+	) -> Result<(), ValidationError> {
 		let cast = &tree.val;
 		// first register items so lower modules can resolve
 		for (n, _) in cast.compounds.iter() {
@@ -143,15 +145,15 @@ impl Root {
 		&mut self,
 		rootind: Index<Module>,
 		tree: ModuleTree
-	) -> Result<(), RootError> {
+	) -> Result<(), ValidationError> {
 		let cast = tree.val;
 		let mut imports = HashMap::new();
 		for n in cast.uses {
 			imports.insert(
-				match n.last().ok_or(RootError::RootAccess)? {
+				match n.last().ok_or(ValidationError::RootAccess)? {
 					ast::PathPart::Regular(s) => s.clone(),
-					ast::PathPart::Root => return Err(RootError::RootAccess),
-					ast::PathPart::Super => return Err(RootError::InvalidPath(ast::PathPart::Super))
+					ast::PathPart::Root => return Err(ValidationError::RootAccess),
+					ast::PathPart::Super => return Err(ValidationError::InvalidPath(ast::PathPart::Super))
 				},
 				self.get_item_path(&n, Some(rootind), &HashMap::new())?
 			);
@@ -167,7 +169,7 @@ impl Root {
 				Some(v) => self.compound_arena[cpdi].supers = Some(
 					match self.get_item_path(&v, Some(rootind), &imports)? {
 						ItemIndex::Compound(v) => v,
-						_ => return Err(RootError::InvalidExtend)
+						_ => return Err(ValidationError::InvalidExtend)
 					}),
 				None => self.compound_arena[cpdi].supers = None
 			};
@@ -240,20 +242,20 @@ impl Root {
 		for (p, d) in cast.describes {
 			let target = match self.get_item_path(&p, Some(rootind), &imports)? {
 				ItemIndex::Compound(v) => v,
-				_ => return Err(RootError::DescribeType)
+				_ => return Err(ValidationError::DescribeType)
 			};
 			let (ref mut dt, ref mut def) = self.registries.entry(d.describe_type)
 				.or_default();
 			if let Some(targets) = d.targets {
 				for n in targets {
 					if dt.contains_key(&n) {
-						return Err(RootError::DuplicateDescribe(format!("{}", n)))
+						return Err(ValidationError::DuplicateDescribe(format!("{}", n)))
 					}
 					dt.insert(n, target);
 				}
 			} else {
 				if def.is_some() {
-					return Err(RootError::DuplicateDescribe(String::from("\"default\"")))
+					return Err(ValidationError::DuplicateDescribe(String::from("\"default\"")))
 				}
 				*def = Some(target);
 			}
@@ -266,9 +268,9 @@ impl Root {
 		path: &[ast::PathPart],
 		rel: Option<Index<Module>>,
 		imports: &HashMap<String, ItemIndex>
-	) -> Result<ItemIndex, RootError> {
+	) -> Result<ItemIndex, ValidationError> {
 		if path.is_empty() {
-			return Err(RootError::RootAccess)
+			return Err(ValidationError::RootAccess)
 		}
 		let mut start = true;
 		let mut current = rel;
@@ -286,7 +288,7 @@ impl Root {
 				None => None,
 				Some(v) => match v {
 					ItemIndex::Module(m) => Some(m),
-					_ => return Err(RootError::NotAModule)
+					_ => return Err(ValidationError::NotAModule)
 				}
 			}
 		};
@@ -294,7 +296,7 @@ impl Root {
 			Some(imports)
 		} else {
 			None
-		})?.ok_or(RootError::RootAccess)
+		})?.ok_or(ValidationError::RootAccess)
 	}
 
 	fn get_child(
@@ -302,18 +304,18 @@ impl Root {
 		part: &ast::PathPart,
 		path: Option<Index<Module>>,
 		imports: Option<&HashMap<String, ItemIndex>>
-	) -> Result<Option<ItemIndex>, RootError> {
+	) -> Result<Option<ItemIndex>, ValidationError> {
 		Ok(match part {
 			ast::PathPart::Root => None,
 			ast::PathPart::Super => self.module_arena[
-				path.ok_or(RootError::RootAccess)?
+				path.ok_or(ValidationError::RootAccess)?
 			].parent.map(ItemIndex::Module),
 			ast::PathPart::Regular(v) => Some(match path {
 				Some(i) => self.module_arena[i].children.get(v.as_str()).cloned().or_else(
 						|| imports.and_then(|h| h.get(v.as_str())).cloned()
 					),
 				None => self.root_modules.get(v.as_str()).map(|v| ItemIndex::Module(*v))
-			}.ok_or_else(|| RootError::UnresolvedItem(v.clone()))?)
+			}.ok_or_else(|| ValidationError::UnresolvedItem(v.clone()))?)
 		})
 	}
 
@@ -334,14 +336,14 @@ impl Root {
 		ft: ast::FieldType,
 		root: Index<Module>,
 		imports: &HashMap<String, ItemIndex>
-	) -> Result<NbtValue, RootError> {
+	) -> Result<NbtValue, ValidationError> {
 		Ok(match ft {
 			ast::FieldType::BooleanType => NbtValue::Boolean,
 			ast::FieldType::StringType => NbtValue::String,
 			ast::FieldType::NamedType(v) => {
 				let item = self.get_item_path(&v, Some(root), imports)?;
 				match item {
-					ItemIndex::Module(_) => return Err(RootError::NotAnItem),
+					ItemIndex::Module(_) => return Err(ValidationError::NotAnItem),
 					ItemIndex::Compound(v) => NbtValue::Compound(v),
 					ItemIndex::Enum(v) => NbtValue::Enum(v)
 				}
@@ -405,7 +407,7 @@ impl Root {
 			ast::FieldType::IdType(v) => NbtValue::Id(v),
 			ast::FieldType::OrType(v) => NbtValue::Or(v.into_iter().map(
 				|x| self.convert_field_type(x, root, imports)
-			).collect::<Result<Vec<NbtValue>, RootError>>()?)
+			).collect::<Result<Vec<NbtValue>, ValidationError>>()?)
 		})
 	}
 }
@@ -425,12 +427,11 @@ struct ModuleTree {
 }
 
 impl ModuleTree {
-	#[allow(dead_code)]
-	pub fn read<P, F>(
+	pub fn read<'a, P, F>(
 		dir: P,
 		name: &str,
 		fp: &F
-	) -> Result<Self, RootError> where P: AsRef<Path>, F: FileProvider {
+	) -> Result<Self, NbtDocError> where P: AsRef<Path>, F: FileProvider {
 		let filename = format!("{}.nbtdoc", name);
 		let mut newdir = PathBuf::from(dir.as_ref());
 		let file = if fp.exists(dir.as_ref().join(&filename)) {
@@ -440,7 +441,17 @@ impl ModuleTree {
 			fp.read_file(dir.as_ref().join(name).join("mod.nbtdoc"))?
 		};
 		let mut out = ModuleTree {
-			val: root(&file)?.1,
+			val: match root::<nom::error::VerboseError<&str>>(&file) {
+				Ok(v) => v,
+				Err(e) => return Err(match e {
+					nom::Err::Error(e) | nom::Err::Failure(e) =>
+						NbtDocError::Parse(convert_error(&file, e)),
+					nom::Err::Incomplete(e) => NbtDocError::Parse(match e {
+						nom::Needed::Size(e) => format!("Needs {} more bytes of data", e),
+						nom::Needed::Unknown => format!("Needs unknown number of bytes")
+					})
+				})
+			}.1,
 			children: HashMap::new()
 		};
 		for x in out.val.mods.iter() {
@@ -450,10 +461,39 @@ impl ModuleTree {
 	}
 }
 
-#[derive(Debug,)]
-pub enum RootError {
+#[derive(Debug)]
+pub enum NbtDocError {
 	Io(io::Error),
-	Parser(nom::Err<nom::error::ErrorKind>),
+	Parse(String),
+	Validation(ValidationError)
+}
+
+impl Display for NbtDocError {
+	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+		match self {
+			Self::Io(e) => write!(f, "{}", e),
+			Self::Parse(e) => write!(f, "{}", e),
+			Self::Validation(e) => write!(f, "{}", e)
+		}
+	}
+}
+
+impl From<io::Error> for NbtDocError {
+	fn from(e: io::Error) -> Self {
+		Self::Io(e)
+	}
+}
+
+impl From<ValidationError> for NbtDocError {
+	fn from(e: ValidationError) -> Self {
+		Self::Validation(e)
+	}
+}
+
+impl Error for NbtDocError {}
+
+#[derive(Debug,)]
+pub enum ValidationError {
 	UnresolvedModule(String),
 	InvalidName(std::ffi::OsString),
 	RootAccess,
@@ -466,48 +506,24 @@ pub enum RootError {
 	DuplicateDescribe(String)
 }
 
-impl Display for RootError {
+impl Display for ValidationError {
 	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
 		match self {
-			RootError::Io(v) => write!(f, "{}", v),
-			RootError::Parser(v) => match v {
-				nom::Err::Error(e) | nom::Err::Failure(e) => write!(f, "{}", e.description()),
-				nom::Err::Incomplete(n) => match n {
-					nom::Needed::Size(v) => write!(f, "needed {} bytes", v),
-					nom::Needed::Unknown => write!(f, "needed unknown number of bytes")
-				}
-			},
-			RootError::UnresolvedModule(v) => write!(f, "unresolved module {}", v),
-			RootError::UnresolvedItem(v) => write!(f, "unresolved item {}", v),
-			RootError::InvalidName(v) => write!(f, "invalid file name {}", v.to_string_lossy()),
-			RootError::RootAccess => write!(f, "cannot index root"),
-			RootError::InvalidPath(v) => write!(f, "invalid path {:?}", v),
-			RootError::InvalidExtend => write!(f, "extends clause was not targeting a compound"),
-			RootError::NotAModule => write!(f, "non-module item in path"),
-			RootError::NotAnItem => write!(f, "field is not an item"),
-			RootError::DescribeType => write!(f, "describe target is not a compound"),
-			RootError::DuplicateDescribe(v) => write!(f, "duplicate describe {}", v)
+			ValidationError::UnresolvedModule(v) => write!(f, "unresolved module {}", v),
+			ValidationError::UnresolvedItem(v) => write!(f, "unresolved item {}", v),
+			ValidationError::InvalidName(v) => write!(f, "invalid file name {}", v.to_string_lossy()),
+			ValidationError::RootAccess => write!(f, "cannot index root"),
+			ValidationError::InvalidPath(v) => write!(f, "invalid path {:?}", v),
+			ValidationError::InvalidExtend => write!(f, "extends clause was not targeting a compound"),
+			ValidationError::NotAModule => write!(f, "non-module item in path"),
+			ValidationError::NotAnItem => write!(f, "field is not an item"),
+			ValidationError::DescribeType => write!(f, "describe target is not a compound"),
+			ValidationError::DuplicateDescribe(v) => write!(f, "duplicate describe {}", v)
 		}
 	}
 }
 
-impl Error for RootError {}
-
-impl <'a> From<nom::Err<(&'a str, nom::error::ErrorKind)>> for RootError {
-	fn from(e: nom::Err<(&'a str, nom::error::ErrorKind)>) -> RootError {
-		RootError::Parser(match e {
-			nom::Err::Error((_, e)) => nom::Err::Error(e),
-			nom::Err::Failure((_, e)) => nom::Err::Failure(e),
-			nom::Err::Incomplete(s) => nom::Err::Incomplete(s)
-		})
-	}
-}
-
-impl From<io::Error> for RootError {
-	fn from(e: io::Error) -> RootError {
-		RootError::Io(e)
-	}
-}
+impl Error for ValidationError {}
 
 #[cfg(test)]
 mod tests {
@@ -529,7 +545,7 @@ mod tests {
 	}
 
 	#[test]
-	fn small_files() -> Result<(), RootError> {
+	fn small_files() -> Result<(), NbtDocError> {
 		let mut fp = MockFileProvider {
 			map: HashMap::new()
 		};
