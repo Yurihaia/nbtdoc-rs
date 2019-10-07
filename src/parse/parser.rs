@@ -14,7 +14,8 @@ use nom::{
 		map_res,
 		opt,
 		not,
-		peek
+		peek,
+		cut
 	},
 	error::ErrorKind,
 	sequence::{
@@ -206,27 +207,27 @@ fn number_type<'a>(
 		tag(ntype),
 		move |i| match ntype {
 			"byte" => map(
-				opt(preceded(atbind, int_range::<i8>)),
+				opt(preceded(atbind, cut(int_range::<i8>))),
 				NumberPrimitiveType::Byte
 			)(i),
 			"short" => map(
-				opt(preceded(atbind, int_range::<i16>)),
+				opt(preceded(atbind, cut(int_range::<i16>))),
 				NumberPrimitiveType::Short
 			)(i),
 			"int" => map(
-				opt(preceded(atbind, int_range::<i32>)),
+				opt(preceded(atbind, cut(int_range::<i32>))),
 				NumberPrimitiveType::Int
 			)(i),
 			"long" => map(
-				opt(preceded(atbind, int_range::<i64>)),
+				opt(preceded(atbind, cut(int_range::<i64>))),
 				NumberPrimitiveType::Long
 			)(i),
 			"float" => map(
-				opt(preceded(atbind, float_range)),
+				opt(preceded(atbind, cut(float_range))),
 				NumberPrimitiveType::Float
 			)(i),
 			"double" => map(
-				opt(preceded(atbind, double_range)),
+				opt(preceded(atbind, cut(double_range))),
 				NumberPrimitiveType::Double
 			)(i),
 			_ => panic!()
@@ -238,10 +239,10 @@ macro_rules! array_map {
 	($i:expr, $id:ident, $t:ty, $atbind:expr) => {
 		map(
 			pair(
-				opt(preceded($atbind, int_range::<$t>)),
+				opt(preceded($atbind, cut(int_range::<$t>))),
 				preceded(
 					tuple((sp, tag("["), sp, tag("]"))),
-					opt(preceded(pair(sp, $atbind), natural_range::<i32>))
+					opt(preceded(pair(sp, $atbind), cut(natural_range::<i32>)))
 				)
 			),
 			|(v, l)| NumberArrayType::$id {
@@ -310,10 +311,10 @@ fn field_type<'a>(i: &'a str) -> IResult<&'a str, FieldType> {
 		map(pair(
 			delimited(
 				pair(tag("["), sp),
-				field_type,
+				cut(field_type),
 				pair(sp, tag("]"))
 			),
-			opt(preceded(tuple((sp, tag("@"), sp)), natural_range::<i32>))
+			opt(preceded(tuple((sp, tag("@"), sp)), cut(natural_range::<i32>)))
 		), |(f, r)| FieldType::ListType {
 			item_type: Box::new(f),
 			len_range: r
@@ -381,12 +382,12 @@ fn key<'a>(i: &'a str) -> IResult<&'a str, &'a str> {
 fn quoted_str<'a>(i: &'a str) -> IResult<&'a str, &'a str> {
 	delimited(
 		tag("\""),
-		escaped(
+		cut(escaped(
 			matches(|c: char| !c.is_control() && c != '"' && c != '\\'),
 			'\\',
 			one_of("\\\"bfnrt")
-		),
-		tag("\"")
+		)),
+		cut(tag("\""))
 	)(i)
 }
 
@@ -407,25 +408,27 @@ fn compound_def<'a>(i: &'a str) -> IResult<&'a str, (String, CompoundDef)> {
 	map(
 		tuple((
 			terminated(doc_comment, sp),
-			preceded(pair(tag("compound"), sp1), ident),
-			opt(preceded(tuple((sp1, tag("extends"), sp1)), ident_path)),
-			preceded(sp, delimited(
-				pair(tag("{"), sp),
-				separated_list(
-					tuple((sp, tag(","), sp)),
-					separated_pair(
-						pair(
-							terminated(doc_comment, sp),
-							map(key, String::from)
-						),
-						tuple((sp, tag(":"), sp)),
-						field_type
-					)
-				),
-				pair(sp, tag("}"))
-			))
+			preceded(pair(tag("compound"), sp1), cut(tuple((
+				ident,
+				opt(preceded(tuple((sp1, tag("extends"), sp1)), cut(ident_path))),
+				preceded(sp, delimited(
+					pair(tag("{"), sp),
+					separated_list(
+						tuple((sp, tag(","), sp)),
+						separated_pair(
+							pair(
+								terminated(doc_comment, sp),
+								map(key, String::from)
+							),
+							tuple((sp, tag(":"), sp)),
+							field_type
+						)
+					),
+					pair(sp, tag("}"))
+				))
+			)))),
 		)),
-		|(desc, id, e, v)| (String::from(id), CompoundDef {
+		|(desc, (id, e, v))| (String::from(id), CompoundDef {
 			description: desc,
 			supers: e,
 			fields: v.into_iter().map(|((dc, k), ft)| (k, Field {
@@ -467,37 +470,48 @@ fn enum_p<'a>(
 	etype: &'static str
 ) -> impl Fn(&'a str) -> IResult<&'a str, (String, EnumDef)> {
 	map(
-		tuple((
+		pair(
 			terminated(doc_comment, sp),
-			preceded(pair(tag("enum"), sp), delimited(
-				pair(tag("("), sp),
-				tag(etype),
-				pair(sp, tag(")"))
-			)),
-			preceded(sp, map(ident, String::from)),
-			preceded(sp, delimited(
-				pair(tag("{"), sp),
-				separated_list(
-					tuple((sp, tag(","), sp)),
-					separated_pair(
-						pair(terminated(doc_comment, sp), map(ident, String::from)),
-						tuple((sp, tag("="), sp)),
-						move |i| match etype {
-							"byte" => map(integer::<i8>, EnumVal::Byte)(i),
-							"short" => map(integer::<i16>, EnumVal::Short)(i),
-							"int" => map(integer::<i32>, EnumVal::Int)(i),
-							"long" => map(integer::<i64>, EnumVal::Long)(i),
-							"float" => map(float, EnumVal::Float)(i),
-							"double" => map(double, EnumVal::Double)(i),
-							"string" => map(quoted_str, |v| EnumVal::String(String::from(v)))(i),
-							_ => panic!("Something is very wrong")
-						}
-					)
-				),
-				pair(sp, tag("}"))
-			))
-		)),
-		move |(desc, _, id, fields)| match etype {
+			preceded(
+				pair(tag("enum"), sp),
+				preceded(
+					tuple((
+						sp,
+						delimited(
+							pair(tag("("), sp),
+							tag(etype),
+							pair(sp, tag(")"))
+						),
+						sp
+					)),
+					cut(pair(
+						map(ident, String::from),
+						preceded(sp, delimited(
+							pair(tag("{"), sp),
+							separated_list(
+								tuple((sp, tag(","), sp)),
+								separated_pair(
+									pair(terminated(doc_comment, sp), map(ident, String::from)),
+									tuple((sp, tag("="), sp)),
+									move |i| match etype {
+										"byte" => map(integer::<i8>, EnumVal::Byte)(i),
+										"short" => map(integer::<i16>, EnumVal::Short)(i),
+										"int" => map(integer::<i32>, EnumVal::Int)(i),
+										"long" => map(integer::<i64>, EnumVal::Long)(i),
+										"float" => map(float, EnumVal::Float)(i),
+										"double" => map(double, EnumVal::Double)(i),
+										"string" => map(quoted_str, |v| EnumVal::String(String::from(v)))(i),
+										_ => panic!("Something is very wrong")
+									}
+								)
+							),
+							pair(sp, tag("}"))
+						))
+					)),
+				)
+			)
+		),
+		move |(desc, (id, fields))| match etype {
 			"byte" => enum_map!(desc, fields, id, Byte),
 			"short" => enum_map!(desc, fields, id, Short),
 			"int" => enum_map!(desc, fields, id, Int),
@@ -541,18 +555,22 @@ fn describe_def<'a>(i: &'a str) -> IResult<&'a str, (Vec<PathPart>, DescribeDef)
 	map(
 		tuple((
 			terminated(ident_path, pair(sp1, tag("describes"))),
-			preceded(sp1, mc_ident),
-			preceded(sp, opt(delimited(
-				pair(tag("["), sp),
-				separated_list(
-					tuple((sp, tag(","), sp)),
-					mc_ident
-				),
-				pair(sp, tag("]")))
+			cut(pair(
+				preceded(sp1, mc_ident),
+				preceded(sp, terminated(
+					opt(delimited(
+						pair(tag("["), sp),
+						cut(separated_list(
+							tuple((sp, tag(","), sp)),
+							mc_ident
+						)),
+						pair(sp, tag("]"))
+					)),
+					pair(sp, tag(";"))
+				))
 			)),
-			tag(";")
 		)),
-		|(id, t, v, _)| (id, DescribeDef {
+		|(id, (t, v))| (id, DescribeDef {
 			describe_type: t,
 			targets: v
 		})
@@ -560,11 +578,11 @@ fn describe_def<'a>(i: &'a str) -> IResult<&'a str, (Vec<PathPart>, DescribeDef)
 }
 
 fn use_def<'a>(i: &'a str) -> IResult<&'a str, Vec<PathPart>> {
-	preceded(pair(tag("use"), sp1), terminated(ident_path, pair(sp, tag(";"))))(i)
+	preceded(pair(tag("use"), sp1), cut(terminated(ident_path, pair(sp, tag(";")))))(i)
 }
 
 fn mod_def<'a>(i: &'a str) -> IResult<&'a str, &'a str> {
-	preceded(pair(tag("mod"), sp1), terminated(ident, pair(sp, tag(";"))))(i)
+	preceded(pair(tag("mod"), sp1), cut(terminated(ident, pair(sp, tag(";")))))(i)
 }
 
 #[cfg(test)]
