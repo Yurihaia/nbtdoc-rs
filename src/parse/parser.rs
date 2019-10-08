@@ -102,7 +102,7 @@ enum RootItem {
 	Compound((String, CompoundDef)),
 	Describe((Vec<PathPart>, DescribeDef)),
 	Enum((String, EnumDef)),
-	Use(Vec<PathPart>),
+	Use((bool, Vec<PathPart>)),
 	Mod(String)
 }
 
@@ -586,8 +586,14 @@ fn describe_def<'a, E: ParseError<&'a str>>(
 	)(i)
 }
 
-fn use_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Vec<PathPart>, E> {
-	preceded(pair(tag("use"), sp1), cut(terminated(ident_path, pair(sp, tag(";")))))(i)
+fn use_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, (bool, Vec<PathPart>), E> {
+	map(
+		pair(
+			opt(pair(tag("export"), sp1)),
+			preceded(pair(tag("use"), sp1), cut(terminated(ident_path, pair(sp, tag(";")))))
+		),
+		|(x, v)| (x.is_some(), v)
+	)(i)
 }
 
 fn mod_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a str, E> {
@@ -1017,10 +1023,17 @@ mod tests {
 			root::<NVE>(include_str!("../../tests/full_file.nbtdoc")),
 			Ok(("", NbtDocFile {
 				mods: vec![],
-				uses: vec![vec![
-					PathPart::Regular(fs!("minecraft")),
-					PathPart::Regular(fs!("entity"))
-				]],
+				uses: vec![
+					(false, vec![
+						PathPart::Regular(fs!("minecraft")),
+						PathPart::Regular(fs!("entity"))
+					]),
+					(true, vec![
+						PathPart::Regular(fs!("minecraft")),
+						PathPart::Regular(fs!("entity")),
+						PathPart::Regular(fs!("Villager"))
+					])
+				],
 				compounds: vec![
 					(fs!("Breedable"), CompoundDef {
 						description: fs!(" A mob which can be bred. It has no other unique NBT"),

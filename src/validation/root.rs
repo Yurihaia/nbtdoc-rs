@@ -91,6 +91,7 @@ impl Root {
 			root
 		);
 		self.register_module_tree(root, &module_tree)?;
+		self.preresolve_module_tree(root, &module_tree)?;
 		self.resolve_module_tree(root, module_tree)?;
 		Ok(())
 	}
@@ -141,6 +142,41 @@ impl Root {
 		Ok(())
 	}
 
+	fn preresolve_module_tree(
+		&mut self,
+		rootind: Index<Module>,
+		tree: &ModuleTree
+	) -> Result<(), ValidationError> {
+		let cast = &tree.val;
+		for (e, n) in cast.uses.iter() {
+			if *e {
+				let last = match n.last().ok_or(ValidationError::RootAccess)? {
+					ast::PathPart::Regular(v) => v,
+					_ => return Err(ValidationError::NotAnItem)
+				};
+				let item = self.get_item_path(
+					&n,
+					Some(rootind),
+					&HashMap::new()
+				)?;
+				if let ItemIndex::Module(_) = item {
+					return Err(ValidationError::NotAnItem);
+				}
+				self.module_arena[rootind].children.insert(last.clone(), item);
+			}
+		};
+		for (n, v) in &tree.children {
+			self.preresolve_module_tree(
+				match &self.module_arena[rootind].children[n] {
+					ItemIndex::Module(v) => *v,
+					_ => panic!()
+				},
+				v
+			)?;
+		}
+		Ok(())
+	}
+
 	fn resolve_module_tree(
 		&mut self,
 		rootind: Index<Module>,
@@ -148,7 +184,7 @@ impl Root {
 	) -> Result<(), ValidationError> {
 		let cast = tree.val;
 		let mut imports = HashMap::new();
-		for n in cast.uses {
+		for (_, n) in cast.uses {
 			imports.insert(
 				match n.last().ok_or(ValidationError::RootAccess)? {
 					ast::PathPart::Regular(s) => s.clone(),
@@ -260,6 +296,15 @@ impl Root {
 				*def = Some(target);
 			}
 		};
+		for (n, v) in tree.children {
+			self.resolve_module_tree(
+				match self.module_arena[rootind].children[&n] {
+					ItemIndex::Module(v) => v,
+					_ => panic!()
+				},
+				v
+			)?;
+		}
 		Ok(())
 	}
 
@@ -330,7 +375,7 @@ impl Root {
 	fn register_enum(&mut self, item: EnumItem) -> Index<EnumItem> {
 		self.enum_arena.push(item)
 	}
-	
+
 	fn convert_field_type(
 		&self,
 		ft: ast::FieldType,

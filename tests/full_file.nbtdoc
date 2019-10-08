@@ -1,4 +1,5 @@
 use minecraft::entity;
+export use minecraft::entity::Villager;
 
 /// A mob which can be bred. It has no other unique NBT
 compound Breedable extends entity::MobBase {
