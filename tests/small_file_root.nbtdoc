@@ -1,5 +1,7 @@
 mod small_file_sibling;
 
+export use small_file_sibling::SpecificCompound;
+
 compound MyCompound {
 	Foo: string
 }

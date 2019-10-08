@@ -3,7 +3,7 @@ use crate::identifier::Identifier;
 
 #[derive(Debug, PartialEq)]
 pub struct NbtDocFile {
-	pub uses: Vec<IdentPath>,
+	pub uses: Vec<(bool, IdentPath)>,
 	pub compounds: Vec<(String, CompoundDef)>,
 	pub enums: Vec<(String, EnumDef)>,
 	pub describes: Vec<(IdentPath, DescribeDef)>,
