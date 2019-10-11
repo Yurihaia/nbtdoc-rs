@@ -13,6 +13,16 @@ impl <T> Default for Arena<T> {
 	}
 }
 
+impl <T> Arena <T> {
+	pub fn iter(&self) -> std::slice::Iter<T> {
+		self.inner.iter()
+	}
+
+	pub fn iter_mut(&mut self) -> std::slice::IterMut<T> {
+		self.inner.iter_mut()
+	}
+}
+
 #[derive(PartialEq, Eq)]
 pub struct Index<T> {
 	index: usize,

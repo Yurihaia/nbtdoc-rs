@@ -53,13 +53,44 @@ impl Root {
 		}
 	}
 
-	pub fn get_regitry(&self, name: &Identifier, id: &Identifier) -> Option<&CompoundTag> {
+	pub fn get_registry(
+		&self,
+		name: &Identifier
+	) -> Option<&(HashMap<Identifier, Index<CompoundTag>>, Option<Index<CompoundTag>>)> {
+		self.registries.get(name)
+	}
+
+	pub fn get_regitry_item(&self, name: &Identifier, id: &Identifier) -> Option<&CompoundTag> {
 		let (r, d) = self.registries.get(name)?;
 		Some(&self.compound_arena[*r.get(id).unwrap_or(&(*d)?)])
 	}
 
 	pub fn get_compound(&self, name: Index<CompoundTag>) -> &CompoundTag {
 		&self.compound_arena[name]
+	}
+
+	pub fn get_module(&self, name: Index<Module>) -> &Module {
+		&self.module_arena[name]
+	}
+
+	pub fn get_enum(&self, name: Index<EnumItem>) -> &EnumItem {
+		&self.enum_arena[name]
+	}
+
+	pub fn get_root_module(&self, name: &str) -> Option<Index<Module>> {
+		self.root_modules.get(name).cloned()
+	}
+
+	pub fn get_modules(&self) -> std::slice::Iter<Module> {
+		self.module_arena.iter()
+	}
+
+	pub fn get_compounds(&self) -> std::slice::Iter<CompoundTag> {
+		self.compound_arena.iter()
+	}
+
+	pub fn get_enums(&self) -> std::slice::Iter<EnumItem> {
+		self.enum_arena.iter()
 	}
 
 	/// `p` needs to be an absolute path
