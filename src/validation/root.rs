@@ -20,6 +20,8 @@ use std::fmt::{
 	Formatter
 };
 
+use super::error::*;
+
 use crate::identifier::Identifier;
 
 use std::convert::From;
@@ -93,7 +95,7 @@ impl Root {
 		self.enum_arena.iter()
 	}
 
-	/// `p` needs to be an absolute path
+	/// `p` needs to be an absolute path, and must be UTF-8
 	pub fn add_root_module<F, P>(
 		&mut self,
 		p: P,
@@ -103,11 +105,7 @@ impl Root {
 			.file_stem()
 			.ok_or(
 				io::Error::from(io::ErrorKind::NotFound)
-			)?.to_str().ok_or_else(
-				|| ValidationError::InvalidName(
-					p.as_ref().file_name().unwrap().to_os_string()
-				)
-			)?;
+			)?.to_str().unwrap();
 		let module_tree = ModuleTree::read(
 			p.as_ref().parent().ok_or(io::Error::from(io::ErrorKind::NotFound))?,
 			module_name,
@@ -122,8 +120,8 @@ impl Root {
 			root
 		);
 		self.register_module_tree(root, &module_tree)?;
-		self.preresolve_module_tree(root, &module_tree)?;
-		self.resolve_module_tree(root, module_tree)?;
+		self.preresolve_module_tree(root, &module_tree, &[module_name])?;
+		self.resolve_module_tree(root, module_tree, &[module_name])?;
 		Ok(())
 	}
 
@@ -176,33 +174,53 @@ impl Root {
 	fn preresolve_module_tree(
 		&mut self,
 		rootind: Index<Module>,
-		tree: &ModuleTree
+		tree: &ModuleTree,
+		module: &[&str]
 	) -> Result<(), ValidationError> {
 		let cast = &tree.val;
+		let eb = |x| ValidationError::new(
+			module.iter().map(|x| String::from(*x)).collect(),
+			x
+		);
 		for (e, n) in cast.uses.iter() {
 			if *e {
-				let last = match n.last().ok_or(ValidationError::RootAccess)? {
+				let last = match n.last().ok_or(
+					eb(ValidationErrorType::RootAccess)
+				)? {
 					ast::PathPart::Regular(v) => v,
-					_ => return Err(ValidationError::NotAnItem)
+					ast::PathPart::Super => return Err(eb(ValidationErrorType::SuperImport)),
+					ast::PathPart::Root => return Err(eb(ValidationErrorType::RootAccess))
 				};
 				let item = self.get_item_path(
 					&n,
 					Some(rootind),
-					&HashMap::new()
+					&HashMap::new(),
+					module
 				)?;
 				if let ItemIndex::Module(_) = item {
-					return Err(ValidationError::NotAnItem);
+					return Err(eb(ValidationErrorType::InvalidType {
+						name: match n.last().unwrap() {
+							ast::PathPart::Regular(v) => v.clone(),
+							_ => panic!()
+						},
+						ex: vec![ItemType::Compound, ItemType::Enum],
+						ty: ItemType::Module
+					}));
 				}
 				self.module_arena[rootind].children.insert(last.clone(), item);
 			}
 		};
 		for (n, v) in &tree.children {
+			let mut m = Vec::with_capacity(module.len() + 1);
+			m.extend(module);
+			m.push(n.as_ref());
 			self.preresolve_module_tree(
 				match &self.module_arena[rootind].children[n] {
 					ItemIndex::Module(v) => *v,
 					_ => panic!()
 				},
-				v
+				v,
+				&m
 			)?;
 		}
 		Ok(())
@@ -211,18 +229,23 @@ impl Root {
 	fn resolve_module_tree(
 		&mut self,
 		rootind: Index<Module>,
-		tree: ModuleTree
+		tree: ModuleTree,
+		module: &[&str]
 	) -> Result<(), ValidationError> {
 		let cast = tree.val;
+		let eb = |x| ValidationError::new(
+			module.iter().map(|x| String::from(*x)).collect(),
+			x
+		);
 		let mut imports = HashMap::new();
 		for (_, n) in cast.uses {
 			imports.insert(
-				match n.last().ok_or(ValidationError::RootAccess)? {
+				match n.last().ok_or(eb(ValidationErrorType::RootAccess))? {
 					ast::PathPart::Regular(s) => s.clone(),
-					ast::PathPart::Root => return Err(ValidationError::RootAccess),
-					ast::PathPart::Super => return Err(ValidationError::InvalidPath(ast::PathPart::Super))
+					ast::PathPart::Root => return Err(eb(ValidationErrorType::RootAccess)),
+					ast::PathPart::Super => return Err(eb(ValidationErrorType::SuperImport))
 				},
-				self.get_item_path(&n, Some(rootind), &HashMap::new())?
+				self.get_item_path(&n, Some(rootind), &HashMap::new(), module)?
 			);
 		}
 		for (n, c) in cast.compounds {
@@ -234,16 +257,24 @@ impl Root {
 			self.compound_arena[cpdi].description = c.description;
 			match c.supers {
 				Some(v) => self.compound_arena[cpdi].supers = Some(
-					match self.get_item_path(&v, Some(rootind), &imports)? {
+					match self.get_item_path(&v, Some(rootind), &imports, module)? {
 						ItemIndex::Compound(v) => v,
-						_ => return Err(ValidationError::InvalidExtend)
+						v => return Err(eb(ValidationErrorType::InvalidType {
+							name: n,
+							ex: vec![ItemType::Compound],
+							ty: match v {
+								ItemIndex::Enum(_) => ItemType::Enum,
+								ItemIndex::Module(_) => ItemType::Module,
+								ItemIndex::Compound(_) => panic!()
+							}
+						}))
 					}),
 				None => self.compound_arena[cpdi].supers = None
 			};
 			for (n, t) in c.fields {
 				let field = Field {
 					description: t.description,
-					nbttype: self.convert_field_type(t.field_type, rootind, &imports)?
+					nbttype: self.convert_field_type(t.field_type, rootind, &imports, module)?
 				};
 				self.compound_arena[cpdi].fields.insert(n, field);
 			}
@@ -307,33 +338,61 @@ impl Root {
 			}
 		}
 		for (p, d) in cast.describes {
-			let target = match self.get_item_path(&p, Some(rootind), &imports)? {
+			let target = match self.get_item_path(&p, Some(rootind), &imports, module)? {
 				ItemIndex::Compound(v) => v,
-				_ => return Err(ValidationError::DescribeType)
+				v => return Err(eb(ValidationErrorType::InvalidType {
+					name: match p.last().ok_or(eb(ValidationErrorType::RootAccess))? {
+						ast::PathPart::Root => String::from("root"),
+						ast::PathPart::Super => String::from("super"),
+						ast::PathPart::Regular(v) => v.clone()
+					},
+					ex: vec![ItemType::Compound],
+					ty: match v {
+						ItemIndex::Enum(_) => ItemType::Enum,
+						ItemIndex::Module(_) => ItemType::Module,
+						ItemIndex::Compound(_) => panic!()
+					}
+				}))
 			};
-			let (ref mut dt, ref mut def) = self.registries.entry(d.describe_type)
-				.or_default();
+			let (ref mut dt, ref mut def) = {
+				if !self.registries.contains_key(&d.describe_type) {
+					self.registries.insert(d.describe_type.clone(), (HashMap::new(), None));
+				};
+				self.registries.get_mut(&d.describe_type).unwrap()
+			};
 			if let Some(targets) = d.targets {
 				for n in targets {
 					if dt.contains_key(&n) {
-						return Err(ValidationError::DuplicateDescribe(format!("{}", n)))
+						return Err(eb(ValidationErrorType::DuplicateDescribe {
+							reg: d.describe_type,
+							t: Some(n)
+						}))
 					}
 					dt.insert(n, target);
 				}
 			} else {
 				if def.is_some() {
-					return Err(ValidationError::DuplicateDescribe(String::from("\"default\"")))
+					return Err(eb(
+						ValidationErrorType::DuplicateDescribe {
+							reg: d.describe_type,
+							t: None
+						}
+					))
 				}
 				*def = Some(target);
 			}
 		};
 		for (n, v) in tree.children {
+			let mut m = Vec::with_capacity(module.len() + 1);
+			m.extend(module);
+			m.push(n.as_ref());
 			self.resolve_module_tree(
 				match self.module_arena[rootind].children[&n] {
 					ItemIndex::Module(v) => v,
 					_ => panic!()
 				},
-				v
+				v,
+				&m
 			)?;
 		}
 		Ok(())
@@ -343,10 +402,15 @@ impl Root {
 		&self,
 		path: &[ast::PathPart],
 		rel: Option<Index<Module>>,
-		imports: &HashMap<String, ItemIndex>
+		imports: &HashMap<String, ItemIndex>,
+		module: &[&str]
 	) -> Result<ItemIndex, ValidationError> {
+		let eb = |x| ValidationError::new(
+			module.iter().map(|x| String::from(*x)).collect(),
+			x
+		);
 		if path.is_empty() {
-			return Err(ValidationError::RootAccess)
+			return Err(eb(ValidationErrorType::RootAccess))
 		}
 		let mut start = true;
 		let mut current = rel;
@@ -359,12 +423,25 @@ impl Root {
 					Some(imports)
 				} else {
 					None
-				}
+				},
+				module
 			)? {
 				None => None,
 				Some(v) => match v {
 					ItemIndex::Module(m) => Some(m),
-					_ => return Err(ValidationError::NotAModule)
+					v => return Err(eb(ValidationErrorType::InvalidType {
+						name: match part {
+							ast::PathPart::Regular(v) => v.clone(),
+							// Super **must** lead to a module, and Root has already been covered
+							_ => panic!()
+						},
+						ex: vec![ItemType::Module],
+						ty: match v {
+							ItemIndex::Compound(_) => ItemType::Compound,
+							ItemIndex::Enum(_) => ItemType::Enum,
+							ItemIndex::Module(_) => panic!()
+						}
+					}))
 				}
 			}
 		};
@@ -372,26 +449,31 @@ impl Root {
 			Some(imports)
 		} else {
 			None
-		})?.ok_or(ValidationError::RootAccess)
+		}, module)?.ok_or(eb(ValidationErrorType::RootAccess))
 	}
 
 	fn get_child(
 		&self,
 		part: &ast::PathPart,
 		path: Option<Index<Module>>,
-		imports: Option<&HashMap<String, ItemIndex>>
+		imports: Option<&HashMap<String, ItemIndex>>,
+		module: &[&str]
 	) -> Result<Option<ItemIndex>, ValidationError> {
+		let eb = |x| ValidationError::new(
+			module.iter().map(|x| String::from(*x)).collect(),
+			x
+		);
 		Ok(match part {
 			ast::PathPart::Root => None,
 			ast::PathPart::Super => self.module_arena[
-				path.ok_or(ValidationError::RootAccess)?
+				path.ok_or(eb(ValidationErrorType::RootAccess))?
 			].parent.map(ItemIndex::Module),
 			ast::PathPart::Regular(v) => Some(match path {
 				Some(i) => self.module_arena[i].children.get(v.as_str()).cloned().or_else(
 						|| imports.and_then(|h| h.get(v.as_str())).cloned()
 					),
 				None => self.root_modules.get(v.as_str()).map(|v| ItemIndex::Module(*v))
-			}.ok_or_else(|| ValidationError::UnresolvedItem(v.clone()))?)
+			}.ok_or_else(|| eb(ValidationErrorType::UnresolvedName(v.clone())))?)
 		})
 	}
 
@@ -411,15 +493,28 @@ impl Root {
 		&self,
 		ft: ast::FieldType,
 		root: Index<Module>,
-		imports: &HashMap<String, ItemIndex>
+		imports: &HashMap<String, ItemIndex>,
+		module: &[&str]
 	) -> Result<NbtValue, ValidationError> {
+		let eb = |x| ValidationError::new(
+			module.iter().map(|x| String::from(*x)).collect(),
+			x
+		);
 		Ok(match ft {
 			ast::FieldType::BooleanType => NbtValue::Boolean,
 			ast::FieldType::StringType => NbtValue::String,
 			ast::FieldType::NamedType(v) => {
-				let item = self.get_item_path(&v, Some(root), imports)?;
+				let item = self.get_item_path(&v, Some(root), imports, module)?;
 				match item {
-					ItemIndex::Module(_) => return Err(ValidationError::NotAnItem),
+					ItemIndex::Module(_) => return Err(eb(ValidationErrorType::InvalidType {
+						name: match v.last().unwrap() {
+							ast::PathPart::Regular(v) => v.clone(),
+							ast::PathPart::Root => String::from("root"),
+							ast::PathPart::Super => String::from("super")
+						},
+						ex: vec![ItemType::Compound, ItemType::Enum],
+						ty: ItemType::Module
+					})),
 					ItemIndex::Compound(v) => NbtValue::Compound(v),
 					ItemIndex::Enum(v) => NbtValue::Enum(v)
 				}
@@ -476,13 +571,13 @@ impl Root {
 			ast::FieldType::ListType { item_type, len_range } => NbtValue::List {
 				length_range: len_range.map(|x|convert_range(x, 0, i32::max_value())),
 				value_type: Box::from(
-					self.convert_field_type(*item_type, root, imports)?
+					self.convert_field_type(*item_type, root, imports, module)?
 				)
 			},
 			ast::FieldType::IndexType { target, path } => NbtValue::Index { path, target },
 			ast::FieldType::IdType(v) => NbtValue::Id(v),
 			ast::FieldType::OrType(v) => NbtValue::Or(v.into_iter().map(
-				|x| self.convert_field_type(x, root, imports)
+				|x| self.convert_field_type(x, root, imports, module)
 			).collect::<Result<Vec<NbtValue>, ValidationError>>()?)
 		})
 	}
@@ -567,39 +662,6 @@ impl From<ValidationError> for NbtDocError {
 }
 
 impl Error for NbtDocError {}
-
-#[derive(Debug,)]
-pub enum ValidationError {
-	UnresolvedModule(String),
-	InvalidName(std::ffi::OsString),
-	RootAccess,
-	UnresolvedItem(String),
-	InvalidPath(ast::PathPart),
-	InvalidExtend,
-	NotAnItem,
-	NotAModule,
-	DescribeType,
-	DuplicateDescribe(String)
-}
-
-impl Display for ValidationError {
-	fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-		match self {
-			ValidationError::UnresolvedModule(v) => write!(f, "unresolved module {}", v),
-			ValidationError::UnresolvedItem(v) => write!(f, "unresolved item {}", v),
-			ValidationError::InvalidName(v) => write!(f, "invalid file name {}", v.to_string_lossy()),
-			ValidationError::RootAccess => write!(f, "cannot index root"),
-			ValidationError::InvalidPath(v) => write!(f, "invalid path {:?}", v),
-			ValidationError::InvalidExtend => write!(f, "extends clause was not targeting a compound"),
-			ValidationError::NotAModule => write!(f, "non-module item in path"),
-			ValidationError::NotAnItem => write!(f, "field is not an item"),
-			ValidationError::DescribeType => write!(f, "describe target is not a compound"),
-			ValidationError::DuplicateDescribe(v) => write!(f, "duplicate describe {}", v)
-		}
-	}
-}
-
-impl Error for ValidationError {}
 
 #[cfg(test)]
 mod tests {
