@@ -36,10 +36,7 @@ use nom::{
 		many1,
 		separated_nonempty_list
 	},
-	number::complete::{
-		double,
-		float
-	},
+	number::complete::recognize_float,
 	IResult
 };
 
@@ -199,11 +196,53 @@ fn natural_range<'a, T: std::str::FromStr, E: ParseError<&'a str>>(
 }
 
 fn float_range<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Range<f32>, E> {
-	range(float)(i)
+	range(float_c)(i)
 }
 
 fn double_range<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Range<f64>, E> {
-	range(double)(i)
+	range(double_c)(i)
+}
+
+fn float_c<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, f32, E> {
+	let (mut r, mut o) = recognize_float(i)?;
+	print!("{:?} {:?}", o, r);
+	if o.ends_with(".") {
+		let (no, nr) = i.split_at(o.len() - 1);
+		r = nr;
+		o = no;
+	}
+	println!(": {:?} {:?}", o, r);
+	match o.parse::<f32>() {
+		Ok(v) => IResult::<&'a str, f32, E>::Ok((r, v)),
+		Err(_) => IResult::<&'a str, f32, E>::Err(
+			nom::Err::Error(
+				E::from_error_kind(
+					i,
+					nom::error::ErrorKind::Float
+				)
+			)
+		)
+	}
+}
+
+fn double_c<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, f64, E> {
+	let (mut r, mut o) = recognize_float(i)?;
+	if o.ends_with(".") {
+		let (nr, no) = i.split_at(o.len() - 1);
+		r = nr;
+		o = no;
+	}
+	match o.parse::<f64>() {
+		Ok(v) => IResult::<&'a str, f64, E>::Ok((r, v)),
+		Err(_) => IResult::<&'a str, f64, E>::Err(
+			nom::Err::Error(
+				E::from_error_kind(
+					i,
+					nom::error::ErrorKind::Float
+				)
+			)
+		)
+	}
 }
 
 fn number_type<'a, E: ParseError<&'a str>>(
@@ -508,8 +547,8 @@ fn enum_p<'a, E: ParseError<&'a str>>(
 										"short" => map(integer::<i16, E>, EnumVal::Short)(i),
 										"int" => map(integer::<i32, E>, EnumVal::Int)(i),
 										"long" => map(integer::<i64, E>, EnumVal::Long)(i),
-										"float" => map(float, EnumVal::Float)(i),
-										"double" => map(double, EnumVal::Double)(i),
+										"float" => map(float_c, EnumVal::Float)(i),
+										"double" => map(double_c, EnumVal::Double)(i),
 										"string" => map(quoted_str, |v| EnumVal::String(String::from(v)))(i),
 										_ => panic!("Something is very wrong")
 									}
