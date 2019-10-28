@@ -276,7 +276,10 @@ fn array_type<'a, E: ParseError<&'a str>>(
 }
 
 fn ident<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a str, E> {
-	take_while(|c: char| c.is_ascii_alphabetic() || c == '_')(i)
+	preceded(
+		peek(matches(|c| c.is_ascii_alphabetic() || c == '_')),
+		take_while(|c: char| c.is_ascii_alphanumeric() || c == '_')
+	)(i)
 }
 
 fn ident_path<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Vec<PathPart>, E> {
@@ -284,7 +287,7 @@ fn ident_path<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Vec<Pa
 		pair(
 			// to handle a root path
 			opt(tag("::")),
-			separated_list(tag("::"), ident)
+			separated_nonempty_list(tag("::"), ident)
 		),
 		|(r, l): (Option<&'a str>, Vec<&'a str>)| {
 			let mut out = vec![];
@@ -368,7 +371,7 @@ fn field_type<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, FieldT
 
 fn field_path<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Vec<FieldPath>, E> {
 	map(
-		separated_list(
+		separated_nonempty_list(
 			tag("."),
 			ident
 		),
@@ -625,6 +628,11 @@ mod tests {
 	#[test]
 	fn quoted_string() {
 		assert_eq!(quoted_str::<NVE>(r#""Hello, World!""#), Ok(("", "Hello, World!")))
+	}
+
+	#[test]
+	fn ident_num() {
+		assert_eq!(ident::<NVE>("Hello027"), Ok(("", "Hello027")))
 	}
 
 	mod sp_tests {
