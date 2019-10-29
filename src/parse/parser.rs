@@ -459,7 +459,23 @@ fn compound_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, (Str
 			terminated(doc_comment, sp),
 			preceded(pair(tag("compound"), sp1), cut(tuple((
 				ident,
-				opt(preceded(tuple((sp1, tag("extends"), sp1)), cut(ident_path))),
+				opt(preceded(tuple((sp1, tag("extends"), sp1)), cut(alt((
+					map(
+						pair(
+							terminated(mc_ident, sp),
+							delimited(
+								pair(tag("["), sp),
+								field_path,
+								pair(sp, tag("]"))
+							)
+						),
+						|(d, p)| CompoundSuper::Registry {
+							target: d,
+							path: p
+						}
+					),
+					map(ident_path, CompoundSuper::Compound),
+				))))),
 				preceded(sp, delimited(
 					pair(tag("{"), sp),
 					separated_list(
@@ -479,7 +495,7 @@ fn compound_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, (Str
 		)),
 		|(desc, (id, e, v))| (String::from(id), CompoundDef {
 			description: desc,
-			supers: e,
+			extend: e,
 			fields: v.into_iter().map(|((dc, k), ft)| (k, Field {
 				description: dc,
 				field_type: ft
@@ -997,10 +1013,41 @@ mod tests {
 								field_type:  FieldType::StringType
 							})
 						],
-						supers: None
+						extend: None
 					}
 				)))
 			);
+		}
+
+		#[test]
+		fn extend_registry() {
+			assert_eq!(
+				compound_def::<NVE>(r#"compound Foo extends namespace:registry[id] {
+					field: id(foo:bar/baz)
+				}"#),
+				Ok(("", (
+					fs!("Foo"),
+					CompoundDef {
+						description: fs!(""),
+						fields: vec![(
+							fs!("field"),
+							Field {
+								description: fs!(""),
+								field_type: FieldType::IdType(Identifier::new(
+									fs!("foo"),
+									fs!("bar/baz")
+								))
+							}
+						)],
+						extend: Some(CompoundSuper::Registry {
+							target: Identifier::new(fs!("namespace"), fs!("registry")),
+							path: vec![
+								FieldPath::Child(fs!("id"))
+							]
+						})
+					}
+				)))
+			)
 		}
 
 		#[test]
@@ -1028,7 +1075,7 @@ mod tests {
 								}
 							)
 						],
-						supers: None
+						extend: None
 					}
 				)))
 			);
@@ -1044,11 +1091,11 @@ mod tests {
 					fs!("Foo"),
 					CompoundDef {
 						description: fs!(""),
-						supers: Some(vec![
+						extend: Some(CompoundSuper::Compound(vec![
 							PathPart::Regular(fs!("some")),
 							PathPart::Regular(fs!("module")),
 							PathPart::Regular(fs!("Bar"))
-						]),
+						])),
 						fields: vec![
 							(
 								fs!("field"),
@@ -1106,10 +1153,10 @@ mod tests {
 								field_type: FieldType::NumberType(NumberPrimitiveType::Long(None))
 							})
 						],
-						supers: Some(vec![
+						extend: Some(CompoundSuper::Compound(vec![
 							PathPart::Regular(fs!("entity")),
 							PathPart::Regular(fs!("MobBase"))
-						])
+						]))
 					}),
 					(fs!("Sheep"), CompoundDef {
 						description: fs!(""),
@@ -1125,9 +1172,9 @@ mod tests {
 								])
 							}),
 						],
-						supers: Some(vec![
+						extend: Some(CompoundSuper::Compound(vec![
 							PathPart::Regular(fs!("Breedable"))
-						])
+						]))
 					}),
 					(fs!("Panda"), CompoundDef {
 						description: fs!(""),
@@ -1149,9 +1196,9 @@ mod tests {
 								])
 							})
 						],
-						supers: Some(vec![
+						extend: Some(CompoundSuper::Compound(vec![
 							PathPart::Regular(fs!("Breedable"))
-						])
+						]))
 					})
 				],
 				enums: vec![

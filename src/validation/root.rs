@@ -255,10 +255,10 @@ impl Root {
 				_ => panic!()
 			};
 			self.compound_arena[cpdi].description = c.description;
-			match c.supers {
-				Some(v) => self.compound_arena[cpdi].supers = Some(
+			match c.extend {
+				Some(ast::CompoundSuper::Compound(v)) => self.compound_arena[cpdi].supers = Some(
 					match self.get_item_path(&v, Some(rootind), &imports, module)? {
-						ItemIndex::Compound(v) => v,
+						ItemIndex::Compound(v) => CompoundExtend::Comound(v),
 						v => return Err(eb(ValidationErrorType::InvalidType {
 							name: n,
 							ex: vec![ItemType::Compound],
@@ -268,7 +268,10 @@ impl Root {
 								ItemIndex::Compound(_) => panic!()
 							}
 						}))
-					}),
+					}
+				),
+				Some(ast::CompoundSuper::Registry { target, path }) =>
+					self.compound_arena[cpdi].supers = Some(CompoundExtend::Registry { target, path }),
 				None => self.compound_arena[cpdi].supers = None
 			};
 			for (n, t) in c.fields {
