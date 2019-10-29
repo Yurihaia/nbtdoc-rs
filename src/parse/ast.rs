@@ -14,7 +14,16 @@ pub struct NbtDocFile {
 pub struct CompoundDef {
 	pub description: String,
 	pub fields: Vec<(String, Field)>,
-	pub supers: Option<IdentPath>
+	pub extend: Option<CompoundSuper>
+}
+
+#[derive(Debug, PartialEq)]
+pub enum CompoundSuper {
+	Compound(IdentPath),
+	Registry {
+		target: Identifier,
+		path: Vec<FieldPath>
+	}
 }
 
 #[derive(Debug, PartialEq)]

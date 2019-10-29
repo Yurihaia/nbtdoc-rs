@@ -37,7 +37,16 @@ pub struct Module {
 pub struct CompoundTag {
 	pub description: String,
 	pub fields: HashMap<String, Field>,
-	pub supers: Option<Index<CompoundTag>>
+	pub supers: Option<CompoundExtend>
+}
+
+#[derive(Debug)]
+pub enum CompoundExtend {
+	Comound(Index<CompoundTag>),
+	Registry {
+		target: Identifier,
+		path: Vec<FieldPath>
+	}
 }
 
 #[derive(Debug)]
