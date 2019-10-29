@@ -205,13 +205,11 @@ fn double_range<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Rang
 
 fn float_c<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, f32, E> {
 	let (mut r, mut o) = recognize_float(i)?;
-	print!("{:?} {:?}", o, r);
 	if o.ends_with(".") {
 		let (no, nr) = i.split_at(o.len() - 1);
 		r = nr;
 		o = no;
 	}
-	println!(": {:?} {:?}", o, r);
 	match o.parse::<f32>() {
 		Ok(v) => IResult::<&'a str, f32, E>::Ok((r, v)),
 		Err(_) => IResult::<&'a str, f32, E>::Err(
