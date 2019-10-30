@@ -410,7 +410,7 @@ fn field_path<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Vec<Fi
 	map(
 		separated_nonempty_list(
 			tag("."),
-			ident
+			key
 		),
 		|v| v.into_iter().map(|x| match x {
 			"super" => FieldPath::Super,
