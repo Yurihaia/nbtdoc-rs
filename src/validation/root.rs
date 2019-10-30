@@ -8,10 +8,7 @@ use std::collections::{
 	HashMap
 };
 use std::io;
-use std::path::{
-	Path,
-	PathBuf
-};
+use std::path::Path;
 
 use std::error::Error;
 use std::fmt::{
@@ -606,14 +603,8 @@ impl ModuleTree {
 		name: &str,
 		fp: &F
 	) -> Result<Self, NbtDocError> where P: AsRef<Path>, F: FileProvider {
-		let filename = format!("{}.nbtdoc", name);
-		let mut newdir = PathBuf::from(dir.as_ref());
-		let file = if fp.exists(dir.as_ref().join(&filename)) {
-			fp.read_file(dir.as_ref().join(&filename))?
-		} else {
-			newdir.push(name);
-			fp.read_file(dir.as_ref().join(name).join("mod.nbtdoc"))?
-		};
+		let dir = dir.as_ref();
+		let file = fp.read_file(dir.join(format!("{}.nbtdoc", name)))?;
 		let mut out = ModuleTree {
 			val: match root::<nom::error::VerboseError<&str>>(&file) {
 				Ok(v) => v,
@@ -629,7 +620,19 @@ impl ModuleTree {
 			children: HashMap::new()
 		};
 		for x in out.val.mods.iter() {
-			out.children.insert(x.clone(), ModuleTree::read(&newdir, x, fp)?);
+			let fname = format!("{}.nbtdoc", x);
+			out.children.insert(x.clone(), match name {
+				"mod" => if fp.exists(dir.join(fname)) {
+					ModuleTree::read(dir, x.as_str(), fp)?
+				} else {
+					ModuleTree::read(dir.join(x), "mod", fp)?
+				},
+				v => if fp.exists(dir.join(v).join(fname)) {
+					ModuleTree::read(dir.join(v), x.as_str(), fp)?
+				} else {
+					ModuleTree::read(dir.join(v).join(x), "mod", fp)?
+				}
+			});
 		}
 		Ok(out)
 	}
@@ -670,6 +673,7 @@ impl Error for NbtDocError {}
 mod tests {
 
 	use super::*;
+	use std::path::PathBuf;
 
 	struct MockFileProvider {
 		map: HashMap<PathBuf, &'static str>
@@ -691,7 +695,7 @@ mod tests {
 			map: HashMap::new()
 		};
 		fp.map.insert(
-			PathBuf::from("/small_file_root.nbtdoc"),
+			PathBuf::from("/mod.nbtdoc"),
 			include_str!("../../tests/small_file_root.nbtdoc")
 		);
 		fp.map.insert(
@@ -699,7 +703,7 @@ mod tests {
 			include_str!("../../tests/small_file_sibling.nbtdoc")
 		);
 		let mut root = Root::new();
-		root.add_root_module("/small_file_root.nbtdoc", &fp)?;
+		root.add_root_module("/mod.nbtdoc", &fp)?;
 		Ok(())
 	}
 }
