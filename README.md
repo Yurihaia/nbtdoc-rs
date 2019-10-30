@@ -1,6 +1,6 @@
 # nbtdoc
 
-nbtdoc is a schema format for describing an NBT format. The format of nbtdocs are a lot like Rust's structs. This library is the "source" library for the format, and any library wishing to parse nbtdocs should use this library as a reference implementation.
+nbtdoc is a schema format for describing an NBT format. The format of nbtdocs are a lot like Rust's structs. This library is the "source" library for the format, and any library wishing to parse nbtdocs should use this library as a reference implementation. The specification for the format can be found [here](docs/format.md)
 
 ## License
 
