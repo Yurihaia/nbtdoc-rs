@@ -34,6 +34,7 @@ The Following Section describes syntax in two forms. the syntax preceded with **
 > &nbsp; &nbsp; | [_ModDecl_](#Module-Declaration)\
 > &nbsp; &nbsp; | [_UseClause_](#Use-Clause)\
 > &nbsp; &nbsp; | [_DescribeClause_](#Describe-Clause)\
+> &nbsp; &nbsp; | [_InjectClause_](#Inject-Clause)\
 > &nbsp; &nbsp; )<sup>*</sup>
 
 ### Common Syntax
