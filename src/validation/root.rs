@@ -865,15 +865,15 @@ mod tests {
 			map: HashMap::new()
 		};
 		fp.map.insert(
-			PathBuf::from("/mod.nbtdoc"),
+			PathBuf::from("/mymod/mod.nbtdoc"),
 			include_str!("../../tests/small_file_root.nbtdoc")
 		);
 		fp.map.insert(
-			PathBuf::from("/small_file_sibling.nbtdoc"),
+			PathBuf::from("/mymod/small_file_sibling.nbtdoc"),
 			include_str!("../../tests/small_file_sibling.nbtdoc")
 		);
 		let mut root = Root::new();
-		root.add_root_module("/mod.nbtdoc", &fp)?;
+		root.add_root_module("/mymod", &fp)?;
 		Ok(())
 	}
 }
