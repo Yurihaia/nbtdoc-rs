@@ -1,4 +1,4 @@
-#![type_length_limit="6940094"]
+#![type_length_limit="60000000"]
 
 mod validation;
 pub mod parse;

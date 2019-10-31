@@ -17,7 +17,11 @@ use std::fmt::{
 	Formatter
 };
 
-use super::error::*;
+use super::error::{
+	ValidationError,
+	ValidationErrorType,
+	ItemType
+};
 
 use crate::identifier::Identifier;
 
@@ -36,7 +40,9 @@ pub struct Root {
 
 	compound_arena: Arena<CompoundTag>,
 	enum_arena: Arena<EnumItem>,
-	module_arena: Arena<Module>
+	module_arena: Arena<Module>,
+	
+	unresolved_inject: Vec<InjectType>
 }
 
 impl Root {
@@ -48,7 +54,9 @@ impl Root {
 
 			compound_arena: Arena::new(),
 			enum_arena: Arena::new(),
-			module_arena: Arena::new()
+			module_arena: Arena::new(),
+
+			unresolved_inject: vec![]
 		}
 	}
 
@@ -119,6 +127,7 @@ impl Root {
 		self.register_module_tree(root, &module_tree)?;
 		self.preresolve_module_tree(root, &module_tree, &[module_name])?;
 		self.resolve_module_tree(root, module_tree, &[module_name])?;
+		self.postresolve_module_tree()?;
 		Ok(())
 	}
 
@@ -141,13 +150,13 @@ impl Root {
 			let ind = self.register_enum(EnumItem {
 				description: String::new(),
 				et: match e.values {
-					ast::EnumType::Byte(_) => EnumType::Byte(vec![]),
-					ast::EnumType::Short(_) => EnumType::Short(vec![]),
-					ast::EnumType::Int(_) => EnumType::Int(vec![]),
-					ast::EnumType::Long(_) => EnumType::Long(vec![]),
-					ast::EnumType::Float(_) => EnumType::Float(vec![]),
-					ast::EnumType::Double(_) => EnumType::Double(vec![]),
-					ast::EnumType::String(_) => EnumType::String(vec![]),
+					ast::EnumType::Byte(_) => EnumType::Byte(HashMap::new()),
+					ast::EnumType::Short(_) => EnumType::Short(HashMap::new()),
+					ast::EnumType::Int(_) => EnumType::Int(HashMap::new()),
+					ast::EnumType::Long(_) => EnumType::Long(HashMap::new()),
+					ast::EnumType::Float(_) => EnumType::Float(HashMap::new()),
+					ast::EnumType::Double(_) => EnumType::Double(HashMap::new()),
+					ast::EnumType::String(_) => EnumType::String(HashMap::new()),
 				}
 			});
 			self.module_arena[rootind].children.insert(n.clone(), ItemIndex::Enum(ind));
@@ -287,54 +296,47 @@ impl Root {
 			self.enum_arena[eni].description = e.description;
 			self.enum_arena[eni].et = match e.values {
 				ast::EnumType::Byte(v) => EnumType::Byte(
-					v.into_iter().map(|(n, v)| EnumOption {
+					v.into_iter().map(|(n, v)| (n, EnumOption {
 						description: v.description,
-						name: n,
 						value: v.value
-					}).collect()
+					})).collect()
 				),
 				ast::EnumType::Short(v) => EnumType::Short(
-					v.into_iter().map(|(n, v)| EnumOption {
+					v.into_iter().map(|(n, v)| (n, EnumOption {
 						description: v.description,
-						name: n,
 						value: v.value
-					}).collect()
+					})).collect()
 				),
 				ast::EnumType::Int(v) => EnumType::Int(
-					v.into_iter().map(|(n, v)| EnumOption {
+					v.into_iter().map(|(n, v)| (n, EnumOption {
 						description: v.description,
-						name: n,
 						value: v.value
-					}).collect()
+					})).collect()
 				),
 				ast::EnumType::Long(v) => EnumType::Long(
-					v.into_iter().map(|(n, v)| EnumOption {
+					v.into_iter().map(|(n, v)| (n, EnumOption {
 						description: v.description,
-						name: n,
 						value: v.value
-					}).collect()
+					})).collect()
 				),
 				ast::EnumType::Float(v) => EnumType::Float(
-					v.into_iter().map(|(n, v)| EnumOption {
+					v.into_iter().map(|(n, v)| (n, EnumOption {
 						description: v.description,
-						name: n,
 						value: v.value
-					}).collect()
+					})).collect()
 				),
 				ast::EnumType::Double(v) => EnumType::Double(
-					v.into_iter().map(|(n, v)| EnumOption {
+					v.into_iter().map(|(n, v)| (n, EnumOption {
 						description: v.description,
-						name: n,
 						value: v.value
-					}).collect()
+					})).collect()
 				),
 				ast::EnumType::String(v) => EnumType::String(
-					v.into_iter().map(|(n, v)| EnumOption {
+					v.into_iter().map(|(n, v)| (n, EnumOption {
 						description: v.description,
-						name: n,
 						value: v.value
-					}).collect()
-				),
+					})).collect()
+				)
 			}
 		}
 		for (p, d) in cast.describes {
@@ -382,6 +384,86 @@ impl Root {
 				*def = Some(target);
 			}
 		};
+		for ast::InjectDef { target, ty } in cast.injects {
+			let uj = match ty {
+				ast::InjectType::Compound(v) => UnresolvedInject::Compound(
+					v.into_iter().map(
+						|(s, f)| Ok((s, Field {
+							description: f.description,
+							nbttype: self.convert_field_type(f.field_type, rootind, &imports, module)?
+						}))
+					).collect::<Result<Vec<_>, _>>()?
+				),
+				ast::InjectType::Enum(v) => UnresolvedInject::Enum(match v {
+					ast::EnumType::Byte(v) => EnumType::Byte(
+						v.into_iter().map(|(n, v)| (n, EnumOption {
+							description: v.description,
+							value: v.value
+						})).collect()
+					),
+					ast::EnumType::Short(v) => EnumType::Short(
+						v.into_iter().map(|(n, v)| (n, EnumOption {
+							description: v.description,
+							value: v.value
+						})).collect()
+					),
+					ast::EnumType::Int(v) => EnumType::Int(
+						v.into_iter().map(|(n, v)| (n, EnumOption {
+							description: v.description,
+							value: v.value
+						})).collect()
+					),
+					ast::EnumType::Long(v) => EnumType::Long(
+						v.into_iter().map(|(n, v)| (n, EnumOption {
+							description: v.description,
+							value: v.value
+						})).collect()
+					),
+					ast::EnumType::Float(v) => EnumType::Float(
+						v.into_iter().map(|(n, v)| (n, EnumOption {
+							description: v.description,
+							value: v.value
+						})).collect()
+					),
+					ast::EnumType::Double(v) => EnumType::Double(
+						v.into_iter().map(|(n, v)| (n, EnumOption {
+							description: v.description,
+							value: v.value
+						})).collect()
+					),
+					ast::EnumType::String(v) => EnumType::String(
+						v.into_iter().map(|(n, v)| (n, EnumOption {
+							description: v.description,
+							value: v.value
+						})).collect()
+					)
+				})
+			};
+			match self.get_item_path(&target, Some(rootind), &imports, module) {
+				Ok(v) => self.unresolved_inject.push(InjectType::Registered(v, uj, match target.last().unwrap() {
+					ast::PathPart::Regular(v) => v.clone(),
+					ast::PathPart::Super => return Err(eb(ValidationErrorType::InvalidType {
+						ex: vec![ItemType::Compound, ItemType::Enum],
+						ty: ItemType::Module,
+						name: String::from(*module.last().unwrap_or(&"::"))
+					})),
+					ast::PathPart::Root => return Err(eb(ValidationErrorType::RootAccess))
+				})),
+				Err(ValidationError {err: ValidationErrorType::UnresolvedName(_), ..}) => {
+					let mut dir: Vec<String> = module.iter().map(|x| String::from(*x)).collect();
+					for x in &target {
+						match x {
+							ast::PathPart::Regular(v) => dir.push(v.clone()),
+							ast::PathPart::Super => { dir.pop(); },
+							ast::PathPart::Root => dir.clear()
+						};
+					}
+					self.unresolved_inject.push(InjectType::Unregistered(dir, uj));
+				},
+				Err(v) => return Err(v)
+			}
+			
+		}
 		for (n, v) in tree.children {
 			let mut m = Vec::with_capacity(module.len() + 1);
 			m.extend(module);
@@ -395,6 +477,82 @@ impl Root {
 				&m
 			)?;
 		}
+		Ok(())
+	}
+
+	fn postresolve_module_tree(
+		&mut self
+	) -> Result<(), ValidationError> {
+		let eb = |x, b: &[String]| ValidationError::new(
+			Vec::from(b),
+			x
+		);
+		let mut rest = Vec::with_capacity(self.unresolved_inject.len());
+		'outer: for v in self.unresolved_inject.drain(..) {
+			let (it, n, m) = match v {
+				InjectType::Registered(i, u, n) => (i, u, n.clone()),
+				InjectType::Unregistered(p, u) => ({
+					let mut iter = p.iter();
+					let mut module = match self.root_modules.get(
+						iter.next().ok_or(eb(ValidationErrorType::RootAccess, &[]))?) {
+						Some(v) => *v,
+						None => {
+							rest.push(InjectType::Unregistered(p, u));
+							continue
+						}
+					};
+					loop {
+						let n = match iter.next() {
+							Some(v) => v,
+							None => {
+								rest.push(InjectType::Unregistered(p, u));
+								continue 'outer
+							}
+						};
+						module = match self.module_arena[module].children.get(n) {
+							Some(v) => match *v {
+								ItemIndex::Module(v) => v,
+								v => break v
+							},
+							None => {
+								rest.push(InjectType::Unregistered(p, u));
+								continue 'outer
+							}
+						}
+					}
+				}, u, p.last().unwrap().clone())
+			};
+			match (it, n) {
+				(ItemIndex::Compound(i), UnresolvedInject::Compound(v)) => {
+					self.compound_arena[i].fields.extend(v)
+				},
+				(ItemIndex::Enum(i), UnresolvedInject::Enum(t)) => {
+					match (&mut self.enum_arena[i].et, t) {
+						(EnumType::Byte(dest), EnumType::Byte(ref mut src)) => dest.extend(src.drain()),
+						(EnumType::Short(dest), EnumType::Short(ref mut src)) => dest.extend(src.drain()),
+						(EnumType::Int(dest), EnumType::Int(ref mut src)) => dest.extend(src.drain()),
+						(EnumType::Long(dest), EnumType::Long(ref mut src)) => dest.extend(src.drain()),
+						(EnumType::Float(dest), EnumType::Float(ref mut src)) => dest.extend(src.drain()),
+						(EnumType::Double(dest), EnumType::Double(ref mut src)) => dest.extend(src.drain()),
+						(EnumType::String(dest), EnumType::String(ref mut src)) => dest.extend(src.drain()),
+						(d, s) => return Err(eb(ValidationErrorType::MismatchedEnum {
+							ex: super::error::EnumType::from(&*d),
+							ty: super::error::EnumType::from(&s),
+							name: m.clone()
+						}, &[]))
+					}
+				},
+				(ItemIndex::Module(_), _) => return Err(ValidationError::new(vec![], ValidationErrorType::InvalidType {
+					ex: vec![ItemType::Enum, ItemType::Compound],
+					name: m.clone(),
+					ty: ItemType::Module
+				})),
+				_ => return Err(ValidationError::new(vec![], ValidationErrorType::UnresolvedName(
+					m.clone()
+				)))
+			};
+		}
+		self.unresolved_inject = rest;
 		Ok(())
 	}
 
@@ -590,6 +748,18 @@ fn convert_range<T: Copy>(range: ast::Range<T>, min: T, max: T) -> Range<T> {
 		ast::Range::Low(l) => Range(l, max),
 		ast::Range::High(h) => Range(min, h)
 	}
+}
+
+#[derive(Debug)]
+enum InjectType {
+	Unregistered(Vec<String>, UnresolvedInject),
+	Registered(ItemIndex, UnresolvedInject, String)
+}
+
+#[derive(Debug)]
+enum UnresolvedInject {
+	Compound(Vec<(String, Field)>),
+	Enum(EnumType)
 }
 
 struct ModuleTree {

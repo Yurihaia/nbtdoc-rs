@@ -6,6 +6,18 @@ compound SpecificCompound extends MyCompound {
 	bruh: MyEnum
 }
 
+inject compound super::InjectCompound {
+	Bar: boolean
+}
+
+inject enum(byte) MyEnum {
+	VarFour = 4
+}
+
+inject compound ::minecraft::test::UInject {
+	Field: string
+}
+
 SpecificCompound describes minecraft:item[
 	minecraft:stick
 ];

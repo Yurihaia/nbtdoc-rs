@@ -29,7 +29,7 @@ The Following Section describes syntax in two forms. the syntax preceded with **
 > **SYNTAX**\
 > _File_:\
 > &nbsp; &nbsp; (\
-> &nbsp; &nbsp; | [_CompoundDef_](#Compound-Definition)\
+> &nbsp; &nbsp; &nbsp; [_CompoundDef_](#Compound-Definition)\
 > &nbsp; &nbsp; | [_EnumDef_](#Enum-Definition)\
 > &nbsp; &nbsp; | [_ModDecl_](#Module-Declaration)\
 > &nbsp; &nbsp; | [_UseClause_](#Use-Clause)\
@@ -57,9 +57,9 @@ An identifier path is the way to reference items from another module. If it star
 #### Minecraft Identifier
 > **SYNTAX (TOKEN)**\
 > MINECRAFT_IDENT:\
-> &nbsp; &nbsp; [ `a` - `z` `_` `-` ]<sup>+</sup>
->               `:` [ `a`-`z` `_` `-` ]<sup>+</sup>
->               ( `/` [ `a`-`z` `_` `-` ]<sup>+</sup> )<sup>*</sup>
+> &nbsp; &nbsp; [ `a` - `z` `_` `-` ]<sup>*</sup>
+>               `:` [ `a`-`z` `_` `-` ]<sup>*</sup>
+>               ( `/` [ `a`-`z` `_` `-` ]<sup>*</sup> )<sup>*</sup>
 
 Minecraft identifiers are just namespaced paths, just like the namespaced resource path in minecraft
 
@@ -93,9 +93,10 @@ A string literal. Cannot contain any control characters (*UNICODE_CC*). Can be e
 > **SYNTAX**\
 > _DocComments_:\
 > &nbsp; &nbsp; DOC_COMMENT<sup>*</sup>
+> 
 > **SYNTAX (TOKEN)**\
 > DOC_COMMENT:\
-> &nbsp; &nbsp; `///` . ~[ **\n** ]* ( **\n** | **EOF** )
+> &nbsp; &nbsp; `///` ~[ **\n** ]<sup>*</sup> ( **\n** | **EOF** )
 
 Doc comments are the way to attatch descriptions to parts of the format. Each doc comment takes up the whole line, and multiple will get concatenated together to make the description. Doc comments should use Markdown for syntax, but don't have to
 
@@ -127,29 +128,29 @@ Each key can be an identifer, or a string in the case that the NBT key cannot be
 
 > **SYNTAX**\
 > _FieldType_:\
-> &nbsp;&nbsp;| `byte` _IntRange_ `[` `]` _NatRange_ // Byte Array \
-> &nbsp;&nbsp;| `int` _IntRange_ `[` `]` _NatRange_ // Int Array \
-> &nbsp;&nbsp;| `long` _IntRange_ `[` `]` _NatRange_ // Long Array \
-> &nbsp;&nbsp;| `boolean` // Byte (0b or 1b) \
-> &nbsp; &nbsp; `byte` _IntRange_ // Byte \
-> &nbsp;&nbsp;| `short` _IntRange_ // Short \
-> &nbsp;&nbsp;| `int` _IntRange_ // Int \
-> &nbsp;&nbsp;| `long` _IntRange_ // Long \
-> &nbsp;&nbsp;| `float` _FloatRange_ // Float \
-> &nbsp;&nbsp;| `double` _FloatRange_ // Double \
-> &nbsp;&nbsp;| `string` // String \
-> &nbsp;&nbsp;| `[` _FieldType_ `]` _Range_ // List \
-> &nbsp;&nbsp;| [_RegistryIndex_](#Registry-Index) // Compound (dynamically indexed) \
-> &nbsp;&nbsp;| `id` `(` [MINECRAFT_IDENT](#Minecraft-Identifier) `)` // String (with id validation) \
-> &nbsp;&nbsp;| [IDENT_PATH](#Identifier-Path) // Compound or Enum \
-> &nbsp;&nbsp;| `(` ( _FieldType_ ( `|`  _FieldType_ )<sup>*</sup> )<sup>?</sup> `)` // Union type
+> &nbsp;&nbsp;  `byte` _IntRange_ `[` `]` _NatRange_ &nbsp; &nbsp; // Byte Array \
+> &nbsp;&nbsp;| `int` _IntRange_ `[` `]` _NatRange_ &nbsp; &nbsp; // Int Array \
+> &nbsp;&nbsp;| `long` _IntRange_ `[` `]` _NatRange_ &nbsp; &nbsp; // Long Array \
+> &nbsp;&nbsp;| `boolean` &nbsp; &nbsp; // Byte (0b or 1b) \
+> &nbsp;&nbsp;| `byte` _IntRange_ &nbsp; &nbsp; // Byte \
+> &nbsp;&nbsp;| `short` _IntRange_ &nbsp; &nbsp; // Short \
+> &nbsp;&nbsp;| `int` _IntRange_ &nbsp; &nbsp; // Int \
+> &nbsp;&nbsp;| `long` _IntRange_ &nbsp; &nbsp; // Long \
+> &nbsp;&nbsp;| `float` _FloatRange_ &nbsp; &nbsp; // Float \
+> &nbsp;&nbsp;| `double` _FloatRange_ &nbsp; &nbsp; // Double \
+> &nbsp;&nbsp;| `string` &nbsp; &nbsp; // String \
+> &nbsp;&nbsp;| `[` _FieldType_ `]` _Range_ &nbsp; &nbsp; // List \
+> &nbsp;&nbsp;| [_RegistryIndex_](#Registry-Index) &nbsp; &nbsp; // Compound (dynamically indexed) \
+> &nbsp;&nbsp;| `id` `(` [MINECRAFT_IDENT](#Minecraft-Identifier) `)` &nbsp; &nbsp; // String (with id validation) \
+> &nbsp;&nbsp;| [IDENT_PATH](#Identifier-Path) &nbsp; &nbsp; // Compound or Enum \
+> &nbsp;&nbsp;| `(` ( _FieldType_ ( `|`  _FieldType_ )<sup>*</sup> )<sup>?</sup> `)` &nbsp; &nbsp; // Union type
 > 
 > _IntRange_:\
 > &nbsp; &nbsp; `@` ( [INTEGER](#Integer) `..` [INTEGER](#Integer)<sup>?</sup>\
 > &nbsp;&nbsp;| `..`<sup>?</sup> [INTEGER](#Integer) )
 > 
 > _NatRange_:\
-> &nbsp; &nbsp; `@` ( [ `1`-`9` ][ `0`-`9` ]<sup>*</sup> `..` ( [ `1`-`9` ][ `0`-`9` ]<sup>*</sup> )<sup>?</sup>\
+> &nbsp; &nbsp; `@` ( [ `1`-`9` ] [ `0`-`9` ] <sup>\*</sup> `..` ( [ `1`-`9` ] [ `0`-`9` ] <sup>*</sup> )<sup>?</sup>\
 > &nbsp;&nbsp;| `..`<sup>?</sup> [ `1`-`9` ][ `0`-`9` ]<sup>*</sup> )
 > 
 > _FloatRange_:\
@@ -230,6 +231,7 @@ Each enum has a number of fields that the value must be one of. The data of the 
 * string - string
 * float - float
 * double - float
+
 If a value has an invalid type it will not parse
 
 ### Module Declaration
@@ -270,3 +272,23 @@ specified by the Minecraft identifier outside the sqaure brackets.
 The Minecraft identifiers inside the square brackets will be mapped to the specified compound.
 If the square brackets and idenitifers inside of them are not present,
 the specified compound will be used as the default for the registry.
+
+### Inject Clause
+
+> **SYNTAX**\
+> _InjectClause_:\
+> &nbsp; &nbsp; `inject` ( _CompoundInject_ | _EnumInject_ )
+> 
+> _CompoundInject_:\
+> &nbsp; &nbsp; `compound` [IDENT_PATH](#Identifier-Path) `{` [_CompoundFields_](#Compound-Definition)<sup>?</sup> `}`
+> 
+> _EnumInject_:\
+> &nbsp; &nbsp; `enum` `(` [ENUM_TYPE](#Enum-Definition) `)`
+>               [IDENT_PATH](#Identifier-Path) `{`
+>               [_EnumField_](#Identifier-Path) ( `,` [_EnumField_](#Identifier-Path) )<sup>*</sup> `}`
+
+The inject clause gives support for injecting data into other items.
+The specified fields will be inserted to the targeted item. The item targeted **does not** have to be loaded in yet,
+and injects will be loaded retroactively. If two injects target the same item, the order they will be applied is not defined,
+and modules should avoid injecting to the same place twice. The injected field will *always* overwrite the source field
+however.

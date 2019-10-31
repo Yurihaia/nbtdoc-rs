@@ -9,8 +9,8 @@ use crate::identifier::Identifier;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationError {
-	module: Vec<String>,
-	err: ValidationErrorType
+	pub module: Vec<String>,
+	pub err: ValidationErrorType
 }
 
 impl ValidationError {
@@ -19,14 +19,6 @@ impl ValidationError {
 			module,
 			err
 		}
-	}
-
-	pub fn get_err(&self) -> &ValidationErrorType {
-		&self.err
-	}
-
-	pub fn get_module(&self) -> &[String] {
-		&self.module
 	}
 }
 
@@ -51,6 +43,32 @@ pub enum ValidationErrorType {
 	DuplicateDescribe {
 		reg: Identifier,
 		t: Option<Identifier>
+	},
+	MismatchedEnum {
+		ex: EnumType,
+		ty: EnumType,
+		name: String
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum EnumType {
+	Byte, Short, Int, Long, Float, Double, String
+}
+
+use super::format::EnumType as ETO;
+
+impl From<&ETO> for EnumType {
+	fn from(t: &ETO) -> Self {
+		match t {
+			ETO::Byte(_) => EnumType::Byte,
+			ETO::Short(_) => EnumType::Short,
+			ETO::Int(_) => EnumType::Int,
+			ETO::Long(_) => EnumType::Long,
+			ETO::Float(_) => EnumType::Float,
+			ETO::Double(_) => EnumType::Double,
+			ETO::String(_) => EnumType::String
+		}
 	}
 }
 
@@ -71,6 +89,10 @@ impl Display for ValidationErrorType {
 					Some(v) => format!("{}", v.clone()),
 					None => String::from("default")
 				}
+			),
+			Self::MismatchedEnum { name, ty, ex } => write!(
+				f, "Invalid enum type {:?} for {}, expected {:?}",
+				ty, name, ex
 			)
 		}
 	}

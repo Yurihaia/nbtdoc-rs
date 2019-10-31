@@ -7,7 +7,20 @@ pub struct NbtDocFile {
 	pub compounds: Vec<(String, CompoundDef)>,
 	pub enums: Vec<(String, EnumDef)>,
 	pub describes: Vec<(IdentPath, DescribeDef)>,
-	pub mods: Vec<String>
+	pub mods: Vec<String>,
+	pub injects: Vec<InjectDef>
+}
+
+#[derive(Debug, PartialEq)]
+pub struct InjectDef {
+	pub ty: InjectType,
+	pub target: IdentPath
+}
+
+#[derive(Debug, PartialEq)]
+pub enum InjectType {
+	Compound(Vec<(String, Field)>),
+	Enum(EnumType)
 }
 
 #[derive(Debug, PartialEq)]

@@ -11,13 +11,13 @@ pub struct EnumItem {
 
 #[derive(Debug)]
 pub enum EnumType {
-	Byte(Vec<EnumOption<i8>>),
-	Short(Vec<EnumOption<i16>>),
-	Int(Vec<EnumOption<i32>>),
-	Long(Vec<EnumOption<i64>>),
-	Float(Vec<EnumOption<f32>>),
-	Double(Vec<EnumOption<f64>>),
-	String(Vec<EnumOption<String>>)
+	Byte(HashMap<String, EnumOption<i8>>),
+	Short(HashMap<String, EnumOption<i16>>),
+	Int(HashMap<String, EnumOption<i32>>),
+	Long(HashMap<String, EnumOption<i64>>),
+	Float(HashMap<String, EnumOption<f32>>),
+	Double(HashMap<String, EnumOption<f64>>),
+	String(HashMap<String, EnumOption<String>>)
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -71,7 +71,6 @@ pub struct Range<T>(pub T, pub T);
 
 #[derive(Debug)]
 pub struct EnumOption<T> {
-	pub name: String,
 	pub value: T,
 	pub description: String
 }

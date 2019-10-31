@@ -6,6 +6,10 @@ compound MyCompound {
 	Foo: string
 }
 
+compound InjectCompound {
+	originalField: byte
+}
+
 enum(byte) MyEnum {
 	VarOne = 1,
 	VarTwo = 2,

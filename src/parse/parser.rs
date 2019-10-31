@@ -70,6 +70,10 @@ pub fn root<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, NbtDocFi
 				map(
 					preceded(sp, terminated(mod_def, sp)),
 					|v| RootItem::Mod(String::from(v))
+				),
+				map(
+					preceded(sp, terminated(inject_def, sp)),
+					RootItem::Inject
 				)
 			))
 		),
@@ -79,7 +83,8 @@ pub fn root<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, NbtDocFi
 				compounds: vec![],
 				enums: vec![],
 				describes: vec![],
-				mods: vec![]
+				mods: vec![],
+				injects: vec![]
 			};
 			for e in v {
 				match e {
@@ -87,7 +92,8 @@ pub fn root<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, NbtDocFi
 					RootItem::Enum(v) => out.enums.push(v),
 					RootItem::Describe(v) => out.describes.push(v),
 					RootItem::Use(v) => out.uses.push(v),
-					RootItem::Mod(v) => out.mods.push(v)
+					RootItem::Mod(v) => out.mods.push(v),
+					RootItem::Inject(v) => out.injects.push(v)
 				}
 			}
 			out
@@ -100,7 +106,8 @@ enum RootItem {
 	Describe((Vec<PathPart>, DescribeDef)),
 	Enum((String, EnumDef)),
 	Use((bool, Vec<PathPart>)),
-	Mod(String)
+	Mod(String),
+	Inject(InjectDef)
 }
 
 fn matches<'a, F, E: ParseError<&'a str>>(f: F) -> impl Fn(&'a str) -> IResult<&'a str, (), E>
@@ -515,17 +522,14 @@ fn enum_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, (String,
 }
 
 macro_rules! enum_map {
-	($desc:expr, $fields:expr, $i:expr, $id:ident) => {
-		($i, EnumDef {
-			description: $desc,
-			values: EnumType::$id($fields.into_iter().map(|((desc, id), v)| (id, EnumValue {
-				description: desc,
-				value: match v {
-					EnumVal::$id(v) => v,
-					_ => panic!("Something is very wrong")
-				}
-			})).collect())
-		})
+	($fields:expr, $id:ident) => {
+		EnumType::$id($fields.into_iter().map(|((desc, id), v)| (id, EnumValue {
+			description: desc,
+			value: match v {
+				EnumVal::$id(v) => v,
+				_ => panic!("Something is very wrong")
+			}
+		})).collect())
 	};
 }
 
@@ -574,16 +578,19 @@ fn enum_p<'a, E: ParseError<&'a str>>(
 				)
 			)
 		),
-		move |(desc, (id, fields))| match etype {
-			"byte" => enum_map!(desc, fields, id, Byte),
-			"short" => enum_map!(desc, fields, id, Short),
-			"int" => enum_map!(desc, fields, id, Int),
-			"long" => enum_map!(desc, fields, id, Long),
-			"float" => enum_map!(desc, fields, id, Float),
-			"double" => enum_map!(desc, fields, id, Double),
-			"string" => enum_map!(desc, fields, id, String),
-			_ => panic!("Something is very wrong")
-		}
+		move |(desc, (id, fields))| (id, EnumDef {
+			description: desc,
+			values: match etype {
+				"byte" => enum_map!(fields, Byte),
+				"short" => enum_map!(fields, Short),
+				"int" => enum_map!(fields, Int),
+				"long" => enum_map!(fields, Long),
+				"float" => enum_map!(fields, Float),
+				"double" => enum_map!(fields, Double),
+				"string" => enum_map!(fields, String),
+				_ => panic!("Something is very wrong")
+			}
+		})
 	) 
 }
 
@@ -600,11 +607,11 @@ enum EnumVal {
 fn mc_ident<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, Identifier, E> {
 	map(
 		tuple((
-			take_while1(|c: char| c.is_ascii_lowercase() | "-_".contains(c)),
+			take_while(|c: char| c.is_ascii_lowercase() | "-_".contains(c)),
 			tag(":"),
 			separated_nonempty_list(
 				tag("/"),
-				take_while1(|c: char| c.is_ascii_lowercase() | "-_".contains(c))
+				take_while(|c: char| c.is_ascii_lowercase() | "-_".contains(c))
 			)
 		)),
 		|(v, _, p)| Identifier::new(
@@ -654,6 +661,110 @@ fn use_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, (bool, Ve
 
 fn mod_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, &'a str, E> {
 	preceded(pair(tag("mod"), sp1), cut(terminated(ident, pair(sp, tag(";")))))(i)
+}
+
+fn inject_def<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, InjectDef, E> {
+	preceded(pair(tag("inject"), sp1), cut(alt((
+		map(
+			pair(
+				preceded(pair(tag("compound"), sp1), ident_path),
+				preceded(sp, delimited(
+					pair(tag("{"), sp),
+					separated_list(
+						tuple((sp, tag(","), sp)),
+						separated_pair(
+							pair(
+								terminated(doc_comment, sp),
+								map(key, String::from)
+							),
+							tuple((sp, tag(":"), sp)),
+							field_type
+						)
+					),
+					pair(sp, tag("}"))
+				))
+			),
+			|(i, p)| InjectDef {
+				ty: InjectType::Compound(p.into_iter().map(
+					|((desc, name), ft)| (name, Field {
+						description: desc,
+						field_type: ft
+					})
+				).collect()),
+				target: i
+			}
+		),
+		map(
+			alt((
+				inject_enum("byte"),
+				inject_enum("short"),
+				inject_enum("int"),
+				inject_enum("long"),
+				inject_enum("float"),
+				inject_enum("double"),
+				inject_enum("string")
+			)),
+			|(p, et)| InjectDef {
+				ty: InjectType::Enum(et),
+				target: p
+			}
+		)
+	))))(i)
+}
+
+fn inject_enum<'a, E: ParseError<&'a str>>(
+	etype: &'static str
+) -> impl Fn(&'a str) -> IResult<&'a str, (Vec<PathPart>, EnumType), E> {
+	preceded(
+		pair(tag("enum"), sp),
+		preceded(
+			tuple((
+				sp,
+				delimited(
+					pair(tag("("), sp),
+					tag(etype),
+					pair(sp, tag(")"))
+				),
+				sp
+			)),
+			cut(pair(
+				ident_path,
+				preceded(sp, map(
+					delimited(
+						pair(tag("{"), sp),
+						separated_list(
+							tuple((sp, tag(","), sp)),
+							separated_pair(
+								pair(terminated(doc_comment, sp), map(ident, String::from)),
+								tuple((sp, tag("="), sp)),
+								move |i| match etype {
+									"byte" => map(integer::<i8, E>, EnumVal::Byte)(i),
+									"short" => map(integer::<i16, E>, EnumVal::Short)(i),
+									"int" => map(integer::<i32, E>, EnumVal::Int)(i),
+									"long" => map(integer::<i64, E>, EnumVal::Long)(i),
+									"float" => map(float_c, EnumVal::Float)(i),
+									"double" => map(double_c, EnumVal::Double)(i),
+									"string" => map(quoted_str, |v| EnumVal::String(String::from(v)))(i),
+									_ => panic!("Something is very wrong")
+								}
+							)
+						),
+						pair(sp, tag("}"))
+					),
+					move |fields| match etype {
+						"byte" => enum_map!(fields, Byte),
+						"short" => enum_map!(fields, Short),
+						"int" => enum_map!(fields, Int),
+						"long" => enum_map!(fields, Long),
+						"float" => enum_map!(fields, Float),
+						"double" => enum_map!(fields, Double),
+						"string" => enum_map!(fields, String),
+						_ => panic!("Something is very wrong")
+					}
+				))
+			)),
+		)
+	)
 }
 
 #[cfg(test)]
@@ -1263,7 +1374,8 @@ mod tests {
 							id!("minecraft", "panda"),
 						])
 					})
-				]
+				],
+				injects: vec![]
 			}))
 		)
 	}
