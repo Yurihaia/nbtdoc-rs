@@ -107,13 +107,13 @@ impl Root {
 		fp: &F
 	) -> Result<(), NbtDocError> where F: FileProvider, P: AsRef<Path> {
 		let module_name = p.as_ref()
-			.file_stem()
+			.file_name()
 			.ok_or(
 				io::Error::from(io::ErrorKind::NotFound)
 			)?.to_str().unwrap();
 		let module_tree = ModuleTree::read(
-			p.as_ref().parent().ok_or(io::Error::from(io::ErrorKind::NotFound))?,
-			module_name,
+			p.as_ref(),
+			"mod",
 			fp
 		)?;
 		let root = self.register_module(Module {
