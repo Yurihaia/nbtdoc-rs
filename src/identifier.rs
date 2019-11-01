@@ -3,6 +3,13 @@ use std::fmt::{
 	Formatter
 };
 
+#[cfg(feature = "serde")]
+use serde::{
+	Serialize,
+	Deserialize
+};
+
+#[cfg_attr(feature= "serde" , derive(Serialize, Deserialize))]
 #[derive(PartialEq, Eq, Clone, Hash, Debug)]
 pub struct Identifier {
 	pub namespace: String,

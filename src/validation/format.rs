@@ -1,15 +1,23 @@
+#[cfg(feature = "serde")]
+use serde::{
+	Serialize,
+	Deserialize
+};
+
 use std::collections::HashMap;
 
 use super::arena::Index;
 use crate::identifier::Identifier;
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EnumItem {
 	pub et: EnumType,
 	pub description: String
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EnumType {
 	Byte(HashMap<String, EnumOption<i8>>),
 	Short(HashMap<String, EnumOption<i16>>),
@@ -20,27 +28,31 @@ pub enum EnumType {
 	String(HashMap<String, EnumOption<String>>)
 }
 
-#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ItemIndex {
 	Enum(Index<EnumItem>),
 	Compound(Index<CompoundTag>),
 	Module(Index<Module>)
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Module {
 	pub children: HashMap<String, ItemIndex>,
 	pub parent: Option<Index<Module>>
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CompoundTag {
 	pub description: String,
 	pub fields: HashMap<String, Field>,
 	pub supers: Option<CompoundExtend>
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CompoundExtend {
 	Comound(Index<CompoundTag>),
 	Registry {
@@ -49,33 +61,39 @@ pub enum CompoundExtend {
 	}
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Field {
 	pub description: String,
 	pub nbttype: NbtValue
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NumberTag<T> {
 	pub range: Option<Range<T>>
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NumberArrayTag<T> {
 	pub length_range: Option<Range<i32>>,
 	pub value_range: Option<Range<T>>
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Range<T>(pub T, pub T);
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EnumOption<T> {
 	pub value: T,
 	pub description: String
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NbtValue {
 	Boolean,
 	Byte(NumberTag<i8>),
@@ -102,7 +120,8 @@ pub enum NbtValue {
 	Or(Vec<NbtValue>)
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FieldPath {
 	Super,
 	Child(String)

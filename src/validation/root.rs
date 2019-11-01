@@ -29,6 +29,13 @@ use std::convert::From;
 
 use nom::error::convert_error;
 
+#[cfg(feature = "serde")]
+use serde::{
+	Serialize,
+	Deserialize
+};
+
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct Root {
 	registries: HashMap<Identifier, (
@@ -750,12 +757,14 @@ fn convert_range<T: Copy>(range: ast::Range<T>, min: T, max: T) -> Range<T> {
 	}
 }
 
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
 #[derive(Debug)]
 enum InjectType {
 	Unregistered(Vec<String>, UnresolvedInject),
 	Registered(ItemIndex, UnresolvedInject, String)
 }
 
+#[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
 #[derive(Debug)]
 enum UnresolvedInject {
 	Compound(Vec<(String, Field)>),
