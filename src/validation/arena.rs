@@ -6,7 +6,8 @@ use serde::{
 	Deserialize
 };
 
-#[cfg_attr(feature= "serde" , derive(Serialize, Deserialize))]
+#[cfg_attr(feature= "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature= "serde", serde(transparent))]
 #[derive(Debug)]
 pub struct Arena<T> {
 	inner: Vec<T>
@@ -30,9 +31,11 @@ impl <T> Arena <T> {
 	}
 }
 
-#[cfg_attr(feature= "serde" , derive(Serialize, Deserialize))]
+#[cfg_attr(feature= "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature= "serde", serde(transparent))]
 pub struct Index<T> {
 	index: usize,
+	#[cfg_attr(feature= "serde", serde(skip))]
 	_pd: std::marker::PhantomData<*const T>
 }
 
