@@ -1,5 +1,12 @@
 use std::fmt;
 
+#[cfg(feature = "serde")]
+use serde::{
+	Serialize,
+	Deserialize
+};
+
+#[cfg_attr(feature= "serde" , derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct Arena<T> {
 	inner: Vec<T>
@@ -23,17 +30,24 @@ impl <T> Arena <T> {
 	}
 }
 
-#[derive(PartialEq, Eq)]
+#[cfg_attr(feature= "serde" , derive(Serialize, Deserialize))]
 pub struct Index<T> {
 	index: usize,
 	_pd: std::marker::PhantomData<*const T>
 }
+
 impl <T> Clone for Index<T> {
 	fn clone(&self) -> Index<T> {
 		Index {
 			index: self.index,
 			_pd: std::marker::PhantomData
 		}
+	}
+}
+
+impl <T> PartialEq for Index<T> {
+	fn eq(&self, other: &Self) -> bool {
+		self.index == other.index
 	}
 }
 

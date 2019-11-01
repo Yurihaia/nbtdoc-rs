@@ -10,3 +10,4 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 nom = "5.0.1"
+serde = { version = "1.0.102", optional = true, features = [ "derive" ] }
