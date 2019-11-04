@@ -7,7 +7,7 @@ The NBTDoc format is a format for documenting NBT structures. It has many simila
 | Symbol | Meaning |
 |--------|---------|
 | `str` | literal |
-| A<sup>*</sup> | A zero or more times |
+| A<sup>\*</sup> | A zero or more times |
 | A<sup>+</sup> | A one or more times |
 | A<sup>?</sup> | A zero or one times |
 | A \| B | Either A or B |
@@ -35,14 +35,14 @@ The Following Section describes syntax in two forms. the syntax preceded with **
 > &nbsp; &nbsp; | [_UseClause_](#Use-Clause)\
 > &nbsp; &nbsp; | [_DescribeClause_](#Describe-Clause)\
 > &nbsp; &nbsp; | [_InjectClause_](#Inject-Clause)\
-> &nbsp; &nbsp; )<sup>*</sup>
+> &nbsp; &nbsp; )<sup>\*</sup>
 
 ### Common Syntax
 
 #### Identifier
 > **SYNTAX (TOKEN)**\
 > IDENT: \
-> &nbsp; &nbsp; [ `A`-`Z` `a`-`z` `_` ] [ `A`-`Z` `a`-`z` `0`-`9` `_` ]<sup>*</sup>
+> &nbsp; &nbsp; [ `A`-`Z` `a`-`z` `_` ] [ `A`-`Z` `a`-`z` `0`-`9` `_` ]<sup>\*</sup>
 
 An identifier is the main form of names in the NBTDoc format.
 
@@ -51,23 +51,23 @@ An identifier is the main form of names in the NBTDoc format.
 > IDENT_PATH: \
 > &nbsp; &nbsp; ( `::` )<sup>?</sup>
 >               ( [IDENT](#Identifier) | `super` )
->               ( `::` ( [IDENT](#Identifier) | `super` ) )<sup>*</sup>
+>               ( `::` ( [IDENT](#Identifier) | `super` ) )<sup>\*</sup>
 
 An identifier path is the way to reference items from another module. If it starts with `::`, the resultant path will start at the global root, not the "crate" root. When one of the parts of the path is `super`, it will reference the parent module.
 
 #### Minecraft Identifier
 > **SYNTAX (TOKEN)**\
 > MINECRAFT_IDENT:\
-> &nbsp; &nbsp; [ `a` - `z` `_` `-` ]<sup>*</sup>
->               `:` [ `a`-`z` `_` `-` ]<sup>*</sup>
->               ( `/` [ `a`-`z` `_` `-` ]<sup>*</sup> )<sup>*</sup>
+> &nbsp; &nbsp; [ `a` - `z` `_` `-` ]<sup>\*</sup>
+>               `:` [ `a`-`z` `_` `-` ]<sup>\*</sup>
+>               ( `/` [ `a`-`z` `_` `-` ]<sup>\*</sup> )<sup>\*</sup>
 
 Minecraft identifiers are just namespaced paths, just like the namespaced resource path in minecraft
 
 #### Integer
 > **SYNTAX (TOKEN)**\
 > INTEGER:\
-> &nbsp; &nbsp; `0` | `-`<sup>?</sup> [ `1`-`9` ] [ `0`-`9` ]<sup>*</sup>
+> &nbsp; &nbsp; `0` | `-`<sup>?</sup> [ `1`-`9` ] [ `0`-`9` ]<sup>\*</sup>
 
 A signed integer
 
@@ -75,7 +75,7 @@ A signed integer
 > **SYNTAX (TOKEN)**\
 > FLOAT:\
 > &nbsp; &nbsp; `-`<sup>?</sup> [ `0`-`9` ]<sup>+</sup> FLOAT_EXPONENT<sup>?</sup>\
-> &nbsp;&nbsp;| `-`<sup>?</sup> [ `0`-`9` ]<sup>*</sup> `.` [ `0`-`9` ]<sup>+</sup> FLOAT_EXPONENT<sup>?</sup>
+> &nbsp;&nbsp;| `-`<sup>?</sup> [ `0`-`9` ]<sup>\*</sup> `.` [ `0`-`9` ]<sup>+</sup> FLOAT_EXPONENT<sup>?</sup>
 > 
 > FLOAT_EXPONENT:\
 > &nbsp; &nbsp; [ `e` `E` ] [ `-` `+` ]<sup>?</sup> [ `0`-`9` ]<sup>+</sup> 
@@ -86,18 +86,18 @@ A signed floating point number
 > **SYNTAX (TOKEN)**\
 > STRING:\
 > &nbsp; &nbsp; `"` ( ~[ `"` `\` *UNICODE_CC* ]
->               | `\` [ `b` `n` `f` `r` `t` `\` `"` ] )<sup>*</sup> `"`
+>               | `\` [ `b` `n` `f` `r` `t` `\` `"` ] )<sup>\*</sup> `"`
 
 A string literal. Cannot contain any control characters (*UNICODE_CC*). Can be escaped with a `\`, and the valid escape characters are `\b`, `\n`, `\f`, `\r`, `t`, `\\`, `\"`.
 
 #### Doc Comment
 > **SYNTAX**\
 > _DocComments_:\
-> &nbsp; &nbsp; DOC_COMMENT<sup>*</sup>
+> &nbsp; &nbsp; DOC_COMMENT<sup>\*</sup>
 > 
 > **SYNTAX (TOKEN)**\
 > DOC_COMMENT:\
-> &nbsp; &nbsp; `///` ~[ **\n** ]<sup>*</sup> ( **\n** | **EOF** )
+> &nbsp; &nbsp; `///` ~[ **\n** ]<sup>\*</sup> ( **\n** | **EOF** )
 
 Doc comments are the way to attatch descriptions to parts of the format. Each doc comment takes up the whole line, and multiple will get concatenated together to make the description. Doc comments should use Markdown for syntax, but don't have to
 
@@ -114,7 +114,7 @@ Doc comments are the way to attatch descriptions to parts of the format. Each do
 > &nbsp; &nbsp; [_DocComments_](#Doc-Comment) KEY `:` [_FieldType_](#Field-Type)
 > 
 > _CompoundFields_:\
-> &nbsp; &nbsp; _CompoundField_ ( `,` _CompoundField_ )<sup>*</sup>
+> &nbsp; &nbsp; _CompoundField_ ( `,` _CompoundField_ )<sup>\*</sup>
 > 
 > **SYNTAX (TOKEN)**\
 > KEY:\
@@ -144,15 +144,15 @@ Each key can be an identifer, or a string in the case that the NBT key cannot be
 > &nbsp;&nbsp;| [_RegistryIndex_](#Registry-Index) &nbsp; &nbsp; // Compound (dynamically indexed) \
 > &nbsp;&nbsp;| `id` `(` [MINECRAFT_IDENT](#Minecraft-Identifier) `)` &nbsp; &nbsp; // String (with id validation) \
 > &nbsp;&nbsp;| [IDENT_PATH](#Identifier-Path) &nbsp; &nbsp; // Compound or Enum \
-> &nbsp;&nbsp;| `(` ( _FieldType_ ( `|`  _FieldType_ )<sup>*</sup> )<sup>?</sup> `)` &nbsp; &nbsp; // Union type
+> &nbsp;&nbsp;| `(` ( _FieldType_ ( `|`  _FieldType_ )<sup>\*</sup> )<sup>?</sup> `)` &nbsp; &nbsp; // Union type
 > 
 > _IntRange_:\
 > &nbsp; &nbsp; `@` ( [INTEGER](#Integer) `..` [INTEGER](#Integer)<sup>?</sup>\
 > &nbsp;&nbsp;| `..`<sup>?</sup> [INTEGER](#Integer) )
 > 
 > _NatRange_:\
-> &nbsp; &nbsp; `@` ( [ `1`-`9` ] [ `0`-`9` ] <sup>\*</sup> `..` ( [ `1`-`9` ] [ `0`-`9` ] <sup>*</sup> )<sup>?</sup>\
-> &nbsp;&nbsp;| `..`<sup>?</sup> [ `1`-`9` ][ `0`-`9` ]<sup>*</sup> )
+> &nbsp; &nbsp; `@` ( [ `1`-`9` ] [ `0`-`9` ] <sup>\*</sup> `..` ( [ `1`-`9` ] [ `0`-`9` ] <sup>\*</sup> )<sup>?</sup>\
+> &nbsp;&nbsp;| `..`<sup>?</sup> [ `1`-`9` ][ `0`-`9` ]<sup>\*</sup> )
 > 
 > _FloatRange_:\
 > &nbsp; &nbsp; `@` ( [FLOAT](#Float) `..` [FLOAT](#Float)?\
@@ -200,7 +200,7 @@ There are 3 types of ranges
 > 
 > **SYNTAX (TOKEN)**\
 > FIELD_PATH:\
-> &nbsp; &nbsp; FIELD_PATH_KEY ( `.` FIELD_PATH_KEY )<sup>*</sup>
+> &nbsp; &nbsp; FIELD_PATH_KEY ( `.` FIELD_PATH_KEY )<sup>\*</sup>
 > 
 > FIELD_PATH_KEY:\
 > &nbsp; &nbsp; `super` | [IDENT](#Identifier) | [STRING](#String)
@@ -213,7 +213,7 @@ When the field path key is `super` the current tag's parent will be accessed.
 > **SYNTAX**\
 > _EnumDef_:\
 > &nbsp; &nbsp; [_DocComments_](#Doc-Comment)
->               `enum` `(` ENUM_TYPE `)` [IDENT](#Identifier) `{` _EnumField_ ( `,` _EnumField_ )<sup>*</sup> `}`
+>               `enum` `(` ENUM_TYPE `)` [IDENT](#Identifier) `{` _EnumField_ ( `,` _EnumField_ )<sup>\*</sup> `}`
 > 
 > _EnumField_:\
 > &nbsp; &nbsp; [_DocComments_](#Doc-Comment) [IDENT](#Identifier) `=`
@@ -263,7 +263,7 @@ If the `export` keyword is in front, then the imported name will be re-exported 
 > &nbsp; &nbsp; [IDENT_PATH](#Identifier-Path) `describes` [MINECRAFT_IDENT](#Minecraft-Identifier)
 >               (
 >                 `[` [MINECRAFT_IDENT](#Minecraft-Identifier)
->                     ( `,` [MINECRAFT_IDENT](#Minecraft-Identifier) )<sup>*</sup>
+>                     ( `,` [MINECRAFT_IDENT](#Minecraft-Identifier) )<sup>\*</sup>
 >                 `]`
 >               )<sup>?</sup> `;`
 
@@ -286,7 +286,7 @@ the specified compound will be used as the default for the registry.
 > _EnumInject_:\
 > &nbsp; &nbsp; `enum` `(` [ENUM_TYPE](#Enum-Definition) `)`
 >               [IDENT_PATH](#Identifier-Path) `{`
->               [_EnumField_](#Identifier-Path) ( `,` [_EnumField_](#Identifier-Path) )<sup>*</sup> `}`
+>               [_EnumField_](#Identifier-Path) ( `,` [_EnumField_](#Identifier-Path) )<sup>\*</sup> `}`
 
 The inject clause gives support for injecting data into other items.
 The specified fields will be inserted to the targeted item. The item targeted **does not** have to be loaded in yet,
