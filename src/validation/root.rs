@@ -138,6 +138,35 @@ impl Root {
 		Ok(())
 	}
 
+	pub fn add_root_modules<F, P>(
+		&mut self,
+		paths: &[P],
+		fp: &F
+	) -> Result<(), NbtDocError> where F: FileProvider, P: AsRef<Path> {
+		let module_infos = paths.iter().map(|p| {
+			let name = p.as_ref()
+				.file_name()
+				.ok_or(
+					io::Error::from(io::ErrorKind::NotFound)
+				)?.to_str().unwrap();
+			let tree = ModuleTree::read(p.as_ref(), "mod", fp)?;
+			let root = self.register_module(Module {
+				children: HashMap::new(),
+				parent: None
+			});
+			self.root_modules.insert(String::from(name), root);
+			Result::<_, NbtDocError>::Ok((name, tree, root))
+		}).collect::<Result<Vec<_>, _>>()?;
+		for (name, tree, root) in module_infos.iter() {
+			self.preresolve_module_tree(*root, tree, &[name])?;
+		}
+		for (name, tree, root) in module_infos.into_iter() {
+			self.resolve_module_tree(root, tree, &[name])?;
+		}
+		self.postresolve_module_tree()?;
+		Ok(())
+	}
+
 	fn register_module_tree(
 		&mut self,
 		rootind: Index<Module>,
@@ -271,7 +300,7 @@ impl Root {
 			match c.extend {
 				Some(ast::CompoundSuper::Compound(v)) => self.compound_arena[cpdi].supers = Some(
 					match self.get_item_path(&v, Some(rootind), &imports, module)? {
-						ItemIndex::Compound(v) => CompoundExtend::Comound(v),
+						ItemIndex::Compound(v) => CompoundExtend::Compound(v),
 						v => return Err(eb(ValidationErrorType::InvalidType {
 							name: n,
 							ex: vec![ItemType::Compound],

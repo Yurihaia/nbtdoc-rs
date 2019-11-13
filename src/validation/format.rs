@@ -54,7 +54,7 @@ pub struct CompoundTag {
 #[cfg_attr(feature = "serde" , derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CompoundExtend {
-	Comound(Index<CompoundTag>),
+	Compound(Index<CompoundTag>),
 	Registry {
 		target: Identifier,
 		path: Vec<FieldPath>
