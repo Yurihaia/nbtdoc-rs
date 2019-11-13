@@ -13,7 +13,9 @@ export module nbtdoc {
 	/**
 	 * A type of index
 	 */
-	export type ItemIndex = Index<CompoundTag> | Index<EnumItem> | Index<Module>;
+	export type ItemIndex = { Compound: Index<CompoundTag> } |
+		{ Enum: Index<EnumItem> } |
+		{ Module: Index<Module> };
 
 	/**
 	 * A segment of a path to an actual NBT value
