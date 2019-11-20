@@ -67,7 +67,7 @@ export module nbtdoc {
 		{ Enum: Index<EnumItem> } |
 		{ List: {
 			/**positive i32 range*/
-			length_range: Range,
+			length_range: Range | null,
 			value_type: NbtValue
 		} } |
 		{ Index: {
