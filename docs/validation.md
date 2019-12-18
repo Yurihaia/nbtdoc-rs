@@ -12,8 +12,11 @@ If you are using the serialized data structure, just index the array `compound_a
 respectively.
 The fields of a compound tag are stored in an enum called `NbtValue`. The only types that can be traversed further is the 
 `Compound` type, the `List` type, the `Index` type, and the `Or` type.
-* For the `Compound` type, the field is just another `Index<CompoundTag>`, which points to another compound. If the
-field is not present in the compound, then check the compound in the `supers` field, and repeat until there are no `supers`.
+* For the `Compound` type, the field is just another `Index<CompoundTag>` or a registry reference, which points to another 
+compound. If the field is not present in the compound, then check the compound in the `supers` field, and repeat until there are 
+no `supers`.
+	* If the `supers` field is `Compound`, just get the compound specified by the index
+	* If the `supers` field is `Registry`, follow the steps specified for the `Index` type below.
 * For the `List` type, the item type is just in the field `value_type`
 * For the `Index` type, to get the next item, access the registry specified by `target` with the value of the NBT at `path`.
 	* To traverse the NBT *value* in accordance to `path`, for each element in `path`:

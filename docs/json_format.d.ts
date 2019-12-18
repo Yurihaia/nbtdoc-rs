@@ -140,10 +140,10 @@ export module nbtdoc {
 		enum_arena: Arena<EnumItem>,
 		module_arena: Arena<Module>,
 		/** Only needed for inner workings */
-		unresolved_inject: (
+		unresolved_inject: Array<
 			{ Unregistered: [ string[], UnresolvedInject ]} |
 			{ Registered: [ ItemIndex, UnresolvedInject, string ]}
-		)
+		>
 	}
 
 	/**
