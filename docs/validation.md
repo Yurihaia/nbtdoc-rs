@@ -24,8 +24,7 @@ no `supers`.
 		* if the variant is `Child(v)`, go to the child of the current tag named `v`.
 	* Note that you cannot go into lists through `Child`, as there is no way to get the index. When going up with `Super`, 
 	go up to the next compound.
-	* When you find the value that contains the id, use `Root::get_regitry_item` to get the next index. If that NBT value is 
-	not present, you must use the registry default if it exists.
+	* When you find the value that contains the id, use `Root::get_regitry_item` to get the next index. If that NBT value is not present, you must use the registry default if it exists. Note that if this is directly inside an `Or` type, and the field is not present, it counts as a failure for the `Or`.
 * For the `Or` type, check each `NbtValue` in order. If one succeeds, use that entry.
 
 Repeat this for each part of the path, and at the end you should be at the correct tag. The validator should create an error 
