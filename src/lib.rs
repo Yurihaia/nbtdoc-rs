@@ -1,6 +1,6 @@
-#![type_length_limit="60000000"]
+#![type_length_limit = "60000000"]
 
-mod validation;
-pub mod parse;
 pub mod identifier;
+pub mod parse;
+mod validation;
 pub use validation::*;
