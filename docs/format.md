@@ -129,9 +129,9 @@ Each key can be an identifer, or a string in the case that the NBT key cannot be
 
 > **SYNTAX**\
 > _FieldType_:\
-> &nbsp;&nbsp;  `byte` _IntRange_ `[` `]` _NatRange_ &nbsp; &nbsp; // Byte Array \
-> &nbsp;&nbsp;| `int` _IntRange_ `[` `]` _NatRange_ &nbsp; &nbsp; // Int Array \
-> &nbsp;&nbsp;| `long` _IntRange_ `[` `]` _NatRange_ &nbsp; &nbsp; // Long Array \
+> &nbsp;&nbsp;  `byte` _IntRange_ `[` `]` _UnsignedRange_ &nbsp; &nbsp; // Byte Array \
+> &nbsp;&nbsp;| `int` _IntRange_ `[` `]` _UnsignedRange_ &nbsp; &nbsp; // Int Array \
+> &nbsp;&nbsp;| `long` _IntRange_ `[` `]` _UnsignedRange_ &nbsp; &nbsp; // Long Array \
 > &nbsp;&nbsp;| `boolean` &nbsp; &nbsp; // Byte (0b or 1b) \
 > &nbsp;&nbsp;| `byte` _IntRange_ &nbsp; &nbsp; // Byte \
 > &nbsp;&nbsp;| `short` _IntRange_ &nbsp; &nbsp; // Short \
@@ -140,7 +140,7 @@ Each key can be an identifer, or a string in the case that the NBT key cannot be
 > &nbsp;&nbsp;| `float` _FloatRange_ &nbsp; &nbsp; // Float \
 > &nbsp;&nbsp;| `double` _FloatRange_ &nbsp; &nbsp; // Double \
 > &nbsp;&nbsp;| `string` &nbsp; &nbsp; // String \
-> &nbsp;&nbsp;| `[` _FieldType_ `]` _Range_ &nbsp; &nbsp; // List \
+> &nbsp;&nbsp;| `[` _FieldType_ `]` _UnsignedRange_ &nbsp; &nbsp; // List \
 > &nbsp;&nbsp;| [_RegistryIndex_](#Registry-Index) &nbsp; &nbsp; // Compound (dynamically indexed) \
 > &nbsp;&nbsp;| `id` `(` [MINECRAFT_IDENT](#Minecraft-Identifier) `)` &nbsp; &nbsp; // String (with id validation) \
 > &nbsp;&nbsp;| [IDENT_PATH](#Identifier-Path) &nbsp; &nbsp; // Compound or Enum \
@@ -150,9 +150,9 @@ Each key can be an identifer, or a string in the case that the NBT key cannot be
 > &nbsp; &nbsp; `@` ( [INTEGER](#Integer) `..` [INTEGER](#Integer)<sup>?</sup>\
 > &nbsp;&nbsp;| `..`<sup>?</sup> [INTEGER](#Integer) )
 > 
-> _NatRange_:\
-> &nbsp; &nbsp; `@` ( [ `1`-`9` ] [ `0`-`9` ] <sup>\*</sup> `..` ( [ `1`-`9` ] [ `0`-`9` ] <sup>\*</sup> )<sup>?</sup>\
-> &nbsp;&nbsp;| `..`<sup>?</sup> [ `1`-`9` ][ `0`-`9` ]<sup>\*</sup> )
+> _UnsignedRange_:\
+> &nbsp; &nbsp; `@` ( ( `0` | [ `1`-`9` ] [ `0`-`9` ] <sup>\*</sup> ) `..` ( `0` | ( [ `1`-`9` ] [ `0`-`9` ] <sup>\*</sup> ) )<sup>?</sup>\
+> &nbsp;&nbsp;| `..`<sup>?</sup> ( `0` | [ `1`-`9` ][ `0`-`9` ] )<sup>\*</sup> )
 > 
 > _FloatRange_:\
 > &nbsp; &nbsp; `@` ( [FLOAT](#Float) `..` [FLOAT](#Float)?\
@@ -189,7 +189,7 @@ They are preceded with an `@`, and they can be in one of the four forms:
 Note that these ranges are *always* inclusive.  
 There are 3 types of ranges
 * Integer ranges, where the values may be signed integers.  
-* Natural ranges, where the values may be unsigned integers.  
+* Unsigned integer ranges, where the values may be unsigned integers.  
 * Float ranges, where the values may be signed floating point numbers.
 
 ##### Registry Index
