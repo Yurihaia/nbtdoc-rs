@@ -111,7 +111,7 @@ Doc comments are the way to attatch descriptions to parts of the format. Each do
 > &nbsp; &nbsp; `extends` ( [IDENT_PATH](#Identifier-Path) | [REGISTRY_INDEX](#Registry-Index) )
 > 
 > _CompoundField_:\
-> &nbsp; &nbsp; [_DocComments_](#Doc-Comment) KEY `:` [_FieldType_](#Field-Type)
+> &nbsp; &nbsp; [_DocComments_](#Doc-Comment) KEY `?`<sup>?</sup> `:` [_FieldType_](#Field-Type)
 > 
 > _CompoundFields_:\
 > &nbsp; &nbsp; _CompoundField_ ( `,` _CompoundField_ )<sup>\*</sup>
